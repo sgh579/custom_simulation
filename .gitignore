@@ -1,0 +1,75 @@
+# Python bytecode and local caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local Python environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Secrets and machine-local config
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Generated simulation datasets and experiment outputs
+data/**
+!data/.gitkeep
+runs/**
+!runs/.gitkeep
+outputs/**
+!outputs/.gitkeep
+artifacts/**
+!artifacts/.gitkeep
+checkpoints/**
+!checkpoints/.gitkeep
+
+# Generated viewer sidecar files
+tools/_models/
+tools/.phantom_viewer_server_*.log
+
+# Large numerical arrays and model artifacts
+*.npz
+*.npy
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+*.h5
+*.hdf5
+
+# Generated mesh/visualization exports
+*.gltf
+*.glb
+*.obj
+*.stl
+*_scan_animation.html
+*_press_player.html
+*_curve.png
+*_comparison.png
+*_map.png
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.old
+
+# OS files
+.DS_Store
+Thumbs.db
