@@ -1,0 +1,14 @@
+name: palpation
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy>=1.24
+  - matplotlib>=3.8
+  - plotly>=6
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu128
+      - torch==2.11.0+cu128
+      - torchvision==0.26.0+cu128
+      - torchaudio==2.11.0+cu128
