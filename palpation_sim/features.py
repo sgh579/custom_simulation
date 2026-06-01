@@ -87,6 +87,27 @@ def extract_feature_map(presses: np.ndarray) -> np.ndarray:
     return feature_map
 
 
+def presses_to_channel_map(presses: np.ndarray) -> np.ndarray:
+    """Convert raw press time series [H, W, T, C] to U-Net channels [T*C, H, W]."""
+    presses = np.asarray(presses, dtype=np.float32)
+    if presses.ndim != 4 or presses.shape[-1] < 2:
+        raise ValueError(f"Expected presses shape [H, W, T, 2+], got {presses.shape}")
+    h, w, t, c = presses.shape
+    return np.transpose(presses, (2, 3, 0, 1)).reshape(t * c, h, w).astype(np.float32)
+
+
+def fz_to_channel_map(fz_or_presses: np.ndarray) -> np.ndarray:
+    """Convert raw Fz trajectories [H, W, T] to U-Net channels [T, H, W]."""
+    values = np.asarray(fz_or_presses, dtype=np.float32)
+    if values.ndim == 4:
+        if values.shape[-1] < 2:
+            raise ValueError(f"Expected presses shape [H, W, T, 2+], got {values.shape}")
+        values = values[..., 1]
+    if values.ndim != 3:
+        raise ValueError(f"Expected Fz shape [H, W, T], got {values.shape}")
+    return np.moveaxis(values, -1, 0).astype(np.float32)
+
+
 def normalize_feature_map(feature_map: np.ndarray, eps: float = 1e-6) -> np.ndarray:
     feature_map = np.asarray(feature_map, dtype=np.float32)
     mean = np.nanmean(feature_map, axis=(1, 2), keepdims=True)

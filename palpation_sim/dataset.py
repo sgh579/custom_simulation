@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from .features import ensure_chw, extract_feature_map, normalize_feature_map
+from .features import ensure_chw, extract_feature_map, fz_to_channel_map, normalize_feature_map, presses_to_channel_map
 
 
 def resolve_npz_files(path_or_files: str | Path | Sequence[str | Path]) -> list[Path]:
@@ -22,18 +22,30 @@ def resolve_npz_files(path_or_files: str | Path | Sequence[str | Path]) -> list[
 
 
 class PalpationProcessDataset(Dataset):
-    """Load palpation process data and convert it to feature maps for U-Net.
+    """Load palpation process data and convert it to U-Net input maps.
 
     Expected sample format:
+    - ``fz``: [H, W, T], raw probe reaction force trajectory
     - ``presses``: [H, W, T, 2], with channels indentation and Fz
     - ``mask``: [H, W], binary inclusion projection label
 
-    Precomputed ``features`` [C, H, W] or [H, W, C] are also accepted.
+    By default, the raw Fz trajectory is used as channels: [H, W, T]
+    becomes [T, H, W]. The full raw press record can be used by setting
+    ``input_mode="presses"``. Precomputed engineered ``features`` [C, H, W]
+    or [H, W, C] can still be used by setting ``input_mode="features"``.
     """
 
-    def __init__(self, path_or_files: str | Path | Sequence[str | Path], normalize: bool = True) -> None:
+    def __init__(
+        self,
+        path_or_files: str | Path | Sequence[str | Path],
+        normalize: bool = True,
+        input_mode: str = "fz",
+    ) -> None:
+        if input_mode not in {"fz", "presses", "features", "auto"}:
+            raise ValueError("input_mode must be one of: 'fz', 'presses', 'features', 'auto'")
         self.files = resolve_npz_files(path_or_files)
         self.normalize = normalize
+        self.input_mode = input_mode
 
     def __len__(self) -> int:
         return len(self.files)
@@ -41,12 +53,22 @@ class PalpationProcessDataset(Dataset):
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         path = self.files[idx]
         with np.load(path) as sample:
-            if "features" in sample:
+            if self.input_mode == "fz":
+                features = _load_fz_channels(sample, path)
+            elif self.input_mode == "presses":
+                if "presses" not in sample:
+                    raise KeyError(f"{path} must contain 'presses' when input_mode='presses'")
+                features = presses_to_channel_map(sample["presses"])
+            elif self.input_mode == "features" and "features" in sample:
                 features = ensure_chw(sample["features"])
-            elif "presses" in sample:
+            elif self.input_mode == "features" and "presses" in sample:
                 features = extract_feature_map(sample["presses"])
+            elif self.input_mode == "auto" and ("fz" in sample or "presses" in sample):
+                features = _load_fz_channels(sample, path)
+            elif self.input_mode == "auto" and "features" in sample:
+                features = ensure_chw(sample["features"])
             else:
-                raise KeyError(f"{path} must contain either 'features' or 'presses'")
+                raise KeyError(f"{path} must contain data compatible with input_mode='{self.input_mode}'")
 
             if "mask" not in sample:
                 raise KeyError(f"{path} must contain 'mask'")
@@ -60,3 +82,11 @@ class PalpationProcessDataset(Dataset):
             mask = np.moveaxis(mask, -1, 0)
 
         return torch.from_numpy(features.astype(np.float32)), torch.from_numpy(mask.astype(np.float32))
+
+
+def _load_fz_channels(sample: np.lib.npyio.NpzFile, path: Path) -> np.ndarray:
+    if "fz" in sample:
+        return fz_to_channel_map(sample["fz"])
+    if "presses" in sample:
+        return fz_to_channel_map(sample["presses"])
+    raise KeyError(f"{path} must contain 'fz' or 'presses' when input_mode='fz'")

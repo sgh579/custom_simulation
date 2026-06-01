@@ -120,6 +120,12 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--base-channels", type=int, default=24)
+    parser.add_argument(
+        "--input-mode",
+        choices=["fz", "presses", "features", "auto"],
+        default="fz",
+        help="U-Net input source: raw Fz trajectory, raw press channels, engineered features, or auto-prefer Fz.",
+    )
     parser.add_argument("--val-fraction", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--num-workers", type=int, default=0)
@@ -137,8 +143,8 @@ def main() -> None:
         train_files = sorted(args.data_dir.glob("*.npz"))
         val_files = sorted(args.val_dir.glob("*.npz"))
 
-    train_ds = PalpationProcessDataset(train_files)
-    val_ds = PalpationProcessDataset(val_files) if val_files else None
+    train_ds = PalpationProcessDataset(train_files, input_mode=args.input_mode)
+    val_ds = PalpationProcessDataset(val_files, input_mode=args.input_mode) if val_files else None
     sample_features, _ = train_ds[0]
     device = resolve_device(args.device)
 
@@ -158,6 +164,9 @@ def main() -> None:
         "train_samples": len(train_ds),
         "val_samples": len(val_ds) if val_ds is not None else 0,
         "feature_shape_chw": list(sample_features.shape),
+        "input_channels": int(sample_features.shape[0]),
+        "input_mode": args.input_mode,
+        "input_description": _input_description(args.input_mode),
         "device": str(device),
         "epochs_requested": args.epochs,
         "max_minutes": args.max_minutes,
@@ -169,7 +178,7 @@ def main() -> None:
         "base_channels": args.base_channels,
         "seed": args.seed,
         "num_workers": args.num_workers,
-        "feature_names": list(FEATURE_NAMES),
+        "feature_names": list(FEATURE_NAMES) if args.input_mode == "features" else [],
     }
     with (args.out_dir / "run_config.json").open("w") as config_file:
         json.dump(run_config, config_file, indent=2)
@@ -223,7 +232,9 @@ def main() -> None:
             "model_state": model.state_dict(),
             "in_channels": int(sample_features.shape[0]),
             "base_channels": args.base_channels,
-            "feature_names": FEATURE_NAMES,
+            "input_mode": args.input_mode,
+            "input_description": _input_description(args.input_mode),
+            "feature_names": FEATURE_NAMES if args.input_mode == "features" else [],
         }
         torch.save(checkpoint, args.out_dir / "last.pt")
         previous_best = best_dice
@@ -252,6 +263,17 @@ def main() -> None:
                 f"no score improvement for {epochs_without_improvement} epochs"
             )
             break
+
+
+def _input_description(input_mode: str) -> str:
+    if input_mode in {"fz", "auto"}:
+        return "raw Fz trajectory channels [T, H, W]"
+    if input_mode == "presses":
+        return "raw indentation and Fz press channels [2*T, H, W]"
+    if input_mode == "features":
+        return "engineered mechanical feature maps [C, H, W]"
+    return input_mode
+
 
 def _load_ml_dependencies() -> None:
     global DataLoader, FEATURE_NAMES, PalpationProcessDataset, ValidationUNet, nn, torch

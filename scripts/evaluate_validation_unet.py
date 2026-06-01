@@ -27,8 +27,9 @@ def main() -> None:
     _load_dependencies()
 
     device = _resolve_device(args.device)
-    dataset = PalpationProcessDataset(args.data_dir)
     checkpoint = torch.load(args.checkpoint, map_location=device)
+    input_mode = str(checkpoint.get("input_mode", "features"))
+    dataset = PalpationProcessDataset(args.data_dir, input_mode=input_mode)
     model = ValidationUNet(
         in_channels=int(checkpoint["in_channels"]),
         base_channels=int(checkpoint.get("base_channels", 24)),
@@ -81,6 +82,8 @@ def main() -> None:
     summary["threshold"] = args.threshold
     summary["checkpoint"] = str(args.checkpoint)
     summary["data_dir"] = str(args.data_dir)
+    summary["input_mode"] = input_mode
+    summary["input_description"] = str(checkpoint.get("input_description", input_mode))
     summary["baseline_stiffness"] = "Equivalent stiffness map k=(F_peak-F_start)/(disp_peak-disp_start) is saved for visualized samples."
     summary["gt_note"] = "Metrics and visualizations use the scan-grid mask, which is the target used for training loss."
 
@@ -112,9 +115,12 @@ def main() -> None:
 def _load_dependencies() -> None:
     global PalpationProcessDataset, ValidationUNet, np, plt, torch
     try:
-        import matplotlib.pyplot as plt_mod
+        import matplotlib
         import numpy as np_mod
         import torch as torch_mod
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt_mod
 
         from palpation_sim.dataset import PalpationProcessDataset as dataset_cls
         from palpation_sim.models import ValidationUNet as model_cls

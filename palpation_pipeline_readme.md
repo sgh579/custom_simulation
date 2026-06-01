@@ -230,6 +230,7 @@ python scripts/train_validation_unet.py \
   --data-dir data/palpation_4lump_32x32x12/train \
   --val-dir data/palpation_4lump_32x32x12/val \
   --out-dir runs/validation_unet_4lump \
+  --input-mode fz \
   --epochs 30 \
   --batch-size 16 \
   --device cuda
@@ -259,4 +260,4 @@ python scripts/evaluate_validation_unet.py \
 
 Each visualized eval sample writes `sample_XXXX_comparison.png` with four panels: GT, network probability, thresholded prediction, and a baseline equivalent-stiffness map. The baseline map is also saved as `sample_XXXX_baseline_stiffness.png` and `.npy`, using `k = (F_peak - F_start) / (disp_peak - disp_start)` at each scan point.
 
-The U-Net follows the reference `scheme1_feature_unet` pattern: raw press curves are converted to mechanical feature maps, normalized per sample, then segmented with a compact 2D U-Net.
+By default the U-Net uses only the raw `Fz` trajectory as input: sample arrays `fz[H, W, T]` are rearranged into `T` image channels `[T, H, W]`, normalized per sample, then segmented with a compact 2D U-Net. The older engineered mechanical feature path remains available only through `--input-mode features`.
