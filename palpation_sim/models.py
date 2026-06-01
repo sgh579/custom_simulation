@@ -66,6 +66,34 @@ class ValidationUNet(nn.Module):
         return self.outc(x)
 
 
+class Xiao2020DepthLSTM(nn.Module):
+    """Two-layer LSTM classifier matching the Xiao et al. 2020 DRNN setup."""
+
+    def __init__(
+        self,
+        input_size: int = 3,
+        hidden_size: int = 70,
+        num_layers: int = 2,
+        num_classes: int = 4,
+        dropout: float = 0.0,
+    ) -> None:
+        super().__init__()
+        lstm_dropout = float(dropout) if num_layers > 1 else 0.0
+        self.lstm = nn.LSTM(
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=lstm_dropout,
+        )
+        self.classifier = nn.Linear(hidden_size, num_classes)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        _outputs, (hidden, _cell) = self.lstm(x)
+        final_hidden = hidden[-1]
+        return self.classifier(final_hidden)
+
+
 def _norm(channels: int) -> nn.GroupNorm:
     groups = min(8, channels)
     while channels % groups != 0:
