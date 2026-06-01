@@ -285,6 +285,68 @@ sample_XXXX_press_records/:
   press_rRRR_cCCC_fz.png:  per-press F-z curve visualization
 ```
 
+## Xiao 2020 LSTM Depth Classifier
+
+The paper-style reproduction uses a single completed palpation sequence:
+
+```text
+x_t = [Fz_t, z_t, Fz_t / z_t], uniformly resampled to 50 time steps
+classes = [0 mm inclusion-free, 5 mm, 8 mm, 10 mm]
+model = two stacked LSTM layers, hidden/cell size 70, softmax classifier
+optimizer = Adam, lr 0.005, lr decay 0.2 every 50 epochs, batch size 64
+normalization = training-set mean/std by default, preserving class-scale differences
+simulation label = lump center depth from the top surface
+```
+
+Generate a fast simulation dataset from the existing strain-stiffening backend:
+
+```bash
+python scripts/generate_xiao_lstm_sim_dataset.py \
+  --out-dir data/xiao_lstm_sim \
+  --samples-per-class-train 70 \
+  --samples-per-class-val 15 \
+  --samples-per-class-test 15 \
+  --sequence-length 50 \
+  --min-indentation-mm 4 \
+  --max-indentation-mm 10
+```
+
+Train the LSTM reproduction:
+
+```bash
+python scripts/train_xiao_lstm.py \
+  --data-dir data/xiao_lstm_sim/train \
+  --val-dir data/xiao_lstm_sim/val \
+  --out-dir runs/xiao_lstm \
+  --epochs 500 \
+  --batch-size 64 \
+  --lr 0.005 \
+  --lr-decay 0.2 \
+  --lr-decay-epochs 50 \
+  --hidden-size 70 \
+  --num-layers 2
+```
+
+Evaluate held-out simulated palpations:
+
+```bash
+python scripts/evaluate_xiao_lstm.py \
+  --checkpoint runs/xiao_lstm/best.pt \
+  --data-dir data/xiao_lstm_sim/test \
+  --out-dir runs/xiao_lstm/eval
+```
+
+The generator writes one `.npz` per single palpation. Each sample contains:
+
+```text
+sequence:        [50, 3] paper input features ordered as Fz, z, Fz/z
+press:           [raw_T, 2] simulated full contact curve with loading/unloading
+loading_press:   [loading_T, 2] monotone simulated loading branch
+label:           class index
+depth_mm:        0, 5, 8, or 10
+metadata_json:   phantom, scan, and lump metadata
+```
+
 Open a specific phantom in the 3D viewer:
 
 ```bash
