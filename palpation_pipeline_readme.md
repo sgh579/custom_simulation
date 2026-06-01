@@ -117,6 +117,72 @@ For this backend, `contact_features[..., :]` are:
 
 The sample also includes `nonlinearity_ratio[H, W]`, the late-slope / early-slope ratio of each F-z curve.
 
+## Native Visualization Stack
+
+The research-facing visualization path is now native Python/VTK rather than browser-first. Update or recreate the conda environment before using these tools:
+
+```bash
+conda env update -f environment.yml --prune
+conda activate palpation
+python -c "import pyvista, vtk, pyvistaqt, PySide6, pyqtgraph; print('native visualization ready')"
+```
+
+Analytic phantom attribute viewer:
+
+```bash
+python scripts/view_phantom_native.py \
+  runs/fixed_four_cylinder_poc/strain_stiffening/metadata.json \
+  --resolution 72
+```
+
+This viewer displays the continuous analytic inclusion shapes from metadata: sphere, ellipsoid, box, cylinder, and capsule. It is intended for inspecting the true phantom attributes, not the discretized tet material assignment.
+
+VTK / ParaView export for large-scale mesh inspection:
+
+```bash
+python scripts/export_native_vtk.py \
+  runs/fixed_four_cylinder_poc/strain_stiffening/fixed_four_cylinder_sample.npz \
+  --out-dir runs/fixed_four_cylinder_poc/strain_stiffening/vtk \
+  --extract-surface \
+  --timeseries-row 10 \
+  --timeseries-col 10 \
+  --timeseries-stride 2
+```
+
+Key outputs:
+
+```text
+*_tet_mesh.vtu                 full tetrahedral unstructured grid with lump/stiffness cell data
+*_tet_surface.vtp              optional extracted tet boundary surface
+*_scan_points.vtp              scan grid point cloud with peak Fz/mask/nonlinearity fields
+analytic_lumps/*.vtp           continuous inclusion surfaces
+*_press_rRRR_cCCC.pvd          ParaView time-series for one selected press
+```
+
+For very large samples, use the `.vtu` and `.pvd` files as the primary mesh/time-series artifacts. The current `.npz` files are compressed, so NumPy cannot memory-map their mesh arrays; avoid exporting all optional products unless you need them.
+
+Native press process player:
+
+```bash
+python scripts/play_press_native.py \
+  runs/fixed_four_cylinder_poc/strain_stiffening/fixed_four_cylinder_sample.npz \
+  --surface-resolution 128
+```
+
+The player uses a PySide6 window with a PyVista viewport and a live F-z plot. It shows analytic inclusions, scan-point peak-force map, probe position, and a deforming top-surface proxy for the selected `(row, col, step)`. This is deliberately lighter than rendering the full tet mesh every frame; inspect full-scale tetrahedral fields in ParaView from the VTK exports.
+
+FEM-style discrete press player:
+
+```bash
+python scripts/play_press_native.py \
+  runs/fixed_four_cylinder_poc/strain_stiffening/fixed_four_cylinder_sample.npz \
+  --mesh-style discrete \
+  --tet-stride 64 \
+  --vertex-stride 16
+```
+
+Discrete mode adds UI toggles for normal tissue, lump tet surfaces, sampled tet wireframe, sampled vertices, scan map, and probe. Lower `--tet-stride` and `--vertex-stride` values show denser mesh detail at higher rendering cost; use `1` only when you really want all tets/vertices.
+
 Controlled strain-stiffening sweep:
 
 ```bash

@@ -1,5 +1,6 @@
 name: palpation
 channels:
+  - conda-forge
   - defaults
 dependencies:
   - python=3.11
@@ -7,6 +8,12 @@ dependencies:
   - numpy>=1.24
   - matplotlib>=3.8
   - plotly>=6
+  - pyvista>=0.45
+  - vtk>=9.3
+  - pyvistaqt>=0.11
+  - pyside6>=6.7
+  - scikit-image>=0.23
+  - pyqtgraph>=0.13
   - pip:
       - --extra-index-url https://download.pytorch.org/whl/cu128
       - --extra-index-url https://pypi.nvidia.com/
