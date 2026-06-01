@@ -9,6 +9,8 @@ dependencies:
   - plotly>=6
   - pip:
       - --extra-index-url https://download.pytorch.org/whl/cu128
+      - --extra-index-url https://pypi.nvidia.com/
       - torch==2.11.0+cu128
       - torchvision==0.26.0+cu128
       - torchaudio==2.11.0+cu128
+      - warp-lang>=1.14.0rc2

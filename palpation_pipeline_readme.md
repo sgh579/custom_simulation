@@ -146,6 +146,24 @@ One high-mesh strain-stiffening phantom:
 
 This script uses a fixed five-lump phantom at higher mesh resolution and writes `one_phantom_high_mesh_sample.npz`, selected F-z summaries/plots, `phantom_high_mesh_material_preview.gltf`, and interactive press players including `press_player.html`.
 
+Fixed four-cylinder proof of concept:
+
+```bash
+python scripts/run_fixed_four_cylinder_poc.py \
+  --out-dir runs/fixed_four_cylinder_poc
+```
+
+This deterministic POC builds an `80 x 80 x 25 mm` phantom with four vertical `20 mm` diameter, `5 mm` high cylinder inclusions at `100x` normal-tissue stiffness. It writes a full high-mesh strain-stiffening run under `runs/fixed_four_cylinder_poc/strain_stiffening` using a `128 x 128 x 40` mesh, `20 x 20` scan grid, `64` press steps, `16 mm` indentation, and an `8 mm` probe diameter. It also writes a practical Newton/VBD neo-Hookean-like POC under `runs/fixed_four_cylinder_poc/newton_poc` using a smaller `32 x 32 x 10` mesh and `5 x 5` scan grid.
+
+For a quick script check without the full output cost:
+
+```bash
+python scripts/run_fixed_four_cylinder_poc.py \
+  --smoke \
+  --skip-newton \
+  --out-dir runs/fixed_four_cylinder_poc
+```
+
 ## Runtime Notes
 
 Measured on this machine with the older 4-lump 32x32x12 analytic setup at 17x17 scan resolution, 100 train + 20 validation samples without per-press plot export took about 3.8 seconds to generate. The strain-stiffening backend is also intended for fast dataset generation and calibration sweeps. The default generator writes per-press CSV/PNG records for traceability, so large training-only batches can pass `--no-save-press-records` when those sidecars are not needed. Higher scan resolutions such as 33x33 improve GT/output granularity but increase per-sample presses quadratically.
