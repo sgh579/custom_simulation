@@ -1,0 +1,54 @@
+{
+  "schema_name": "palpation_sample_metadata",
+  "schema_version": 2,
+  "data_contract": {
+    "version": 1,
+    "definition": "docs/data_contract.md",
+    "template": "docs/metadata_template.json"
+  },
+  "runtime": {
+    "python": {
+      "environment_manager": "conda",
+      "environment_name": "palpation",
+      "executable": "<absolute python executable>",
+      "conda_default_env": "palpation"
+    },
+    "newton": {
+      "root": "/home/guoheng/newton",
+      "simulator_entrypoint": "palpation_sim.newton_vbd.NewtonVBDPalpationSimulator"
+    },
+    "device": {
+      "required": "cuda:0",
+      "requested": "cuda:0"
+    }
+  },
+  "units": {
+    "length": "m",
+    "force": "N",
+    "mass": "kg",
+    "time": "s",
+    "stiffness": "N/m",
+    "lame_parameters": "Pa"
+  },
+  "sample_id": "<sample id>",
+  "split": "<train|val|single|newton_vbd>",
+  "files": {
+    "metadata": "metadata.json",
+    "npz": "<sample npz filename>",
+    "phantom_3d": "<optional glTF filename or null>",
+    "press_records": "<optional press-record directory or null>",
+    "scan_animation": "<optional HTML animation or null>"
+  },
+  "backend": "newton_vbd",
+  "phantom": {},
+  "material": {},
+  "scan": {
+    "x_values": [],
+    "y_values": [],
+    "indentation_values": []
+  },
+  "num_lumps": 0,
+  "lumps": [],
+  "arrays": {},
+  "mask": null
+}

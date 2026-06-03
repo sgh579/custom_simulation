@@ -10,6 +10,13 @@ import numpy as np
 
 from .config import MaterialConfig, PhantomConfig, ScanConfig
 from .phantom import LumpSpec, create_structured_tet_mesh, material_arrays_for_lumps, normalize_lumps
+from .workflow import (
+    DATASET_METADATA_SCHEMA_VERSION,
+    SAMPLE_METADATA_SCHEMA_VERSION,
+    json_ready,
+    metadata_contract,
+    runtime_metadata,
+)
 
 TET_FACES: tuple[tuple[int, int, int], ...] = ((0, 1, 2), (0, 3, 1), (0, 2, 3), (1, 3, 2))
 TET_EDGES: tuple[tuple[int, int], ...] = ((0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3))
@@ -25,6 +32,7 @@ def build_ground_truth_metadata(
     lumps: LumpSpec | Sequence[LumpSpec],
     sample: dict[str, object] | None = None,
     npz_path: Path | None = None,
+    metadata_path: Path | None = None,
     gltf_path: Path | None = None,
     press_records_dir: Path | None = None,
     scan_animation_path: Path | None = None,
@@ -32,10 +40,22 @@ def build_ground_truth_metadata(
     """Create a JSON-friendly metadata record for one generated phantom."""
     lump_list = normalize_lumps(lumps)
     metadata: dict[str, object] = {
-        "schema_version": 1,
+        "schema_name": "palpation_sample_metadata",
+        "schema_version": SAMPLE_METADATA_SCHEMA_VERSION,
+        "data_contract": metadata_contract(),
+        "runtime": runtime_metadata(),
+        "units": {
+            "length": "m",
+            "force": "N",
+            "mass": "kg",
+            "time": "s",
+            "stiffness": "N/m",
+            "lame_parameters": "Pa",
+        },
         "sample_id": sample_id,
         "split": split,
         "files": {
+            "metadata": metadata_path.name if metadata_path is not None else None,
             "npz": npz_path.name if npz_path is not None else None,
             "phantom_3d": gltf_path.name if gltf_path is not None else None,
             "press_records": press_records_dir.name if press_records_dir is not None else None,
@@ -75,6 +95,54 @@ def build_ground_truth_metadata(
     return metadata
 
 
+def build_dataset_metadata(
+    *,
+    dataset_id: str,
+    backend: str,
+    seed: int,
+    phantom: PhantomConfig,
+    material: MaterialConfig,
+    scan: ScanConfig,
+    split_counts: dict[str, int],
+    args: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "schema_name": "palpation_dataset_metadata",
+        "schema_version": DATASET_METADATA_SCHEMA_VERSION,
+        "data_contract": metadata_contract(),
+        "runtime": runtime_metadata(),
+        "dataset_id": dataset_id,
+        "backend": backend,
+        "seed": int(seed),
+        "files": {
+            "metadata": "metadata.json",
+            "sample_npz_pattern": "{split}/sample_{index:04d}.npz",
+            "sample_metadata_pattern": "{split}/sample_{index:04d}_gt.json",
+            "sample_phantom_3d_pattern": "{split}/sample_{index:04d}_phantom.gltf",
+            "sample_press_records_pattern": "{split}/sample_{index:04d}_press_records/",
+        },
+        "phantom": phantom.to_dict(),
+        "material": material.to_dict(),
+        "scan": {
+            **scan.to_dict(),
+            "x_values": scan.x_values(phantom),
+            "y_values": scan.y_values(phantom),
+            "indentation_values": scan.indentation_values(),
+        },
+        "splits": {
+            split: {
+                "count": int(count),
+                "sample_npz_pattern": f"{split}/sample_{{index:04d}}.npz",
+                "sample_metadata_pattern": f"{split}/sample_{{index:04d}}_gt.json",
+                "sample_phantom_3d_pattern": f"{split}/sample_{{index:04d}}_phantom.gltf",
+                "sample_press_records_pattern": f"{split}/sample_{{index:04d}}_press_records/",
+            }
+            for split, count in split_counts.items()
+        },
+        "args": json_ready(args),
+    }
+
+
 def write_press_records(
     out_dir: Path,
     sample: dict[str, object],
@@ -88,7 +156,7 @@ def write_press_records(
     except ModuleNotFoundError as exc:
         raise RuntimeError(
             "matplotlib is required to write press record plots. "
-            "Use /home/goodmansun/miniconda3/envs/torchnightly/bin/python."
+            "Run this script from the conda environment 'palpation'."
         ) from exc
 
     presses = _require_sample_array(sample, "presses")
