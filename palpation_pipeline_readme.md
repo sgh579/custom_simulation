@@ -10,13 +10,15 @@ This workspace contains an end-to-end pipeline for synthetic palpation data:
 
 ## Environment Setup
 
-Create or update the conda environment from the tracked environment file:
+Create or update the pinned conda environment from the tracked environment file:
 
 ```bash
 conda env create -f environment.yml
 conda activate palpation
 python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available())"
 ```
+
+All workflow commands are expected to run in this environment. When the shell is not already activated, use `conda run -n palpation python ...`.
 
 For native visualization, make sure the optional VTK/PySide stack is installed:
 
@@ -62,10 +64,10 @@ python scripts/generate_palpation_dataset.py \
   --press-steps 16 \
   --substeps-per-depth 3 \
   --vbd-iterations 5 \
-  --device auto
+  --device cuda:0
 ```
 
-Use `--device cpu` for CPU debugging or `--device cuda:0` to force a specific GPU. With `--device auto`, the Newton wrapper picks CUDA when Warp can see a CUDA device and otherwise falls back to CPU.
+Newton/VBD simulation is intentionally GPU-only in this workflow. The pinned device is `cuda:0`; if Warp cannot see that GPU, the script stops instead of falling back to CPU.
 
 With `cells-x=32`, `cells-y=32`, and `cells-z=12`, the structured mesh has 14,157 particles and 61,440 tetrahedra. The default sampler keeps each inclusion geometry complete and only enforces that occupied z intervals do not overlap unless `--allow-z-overlap` is passed; x/y projections may overlap.
 
@@ -89,6 +91,7 @@ phantom_json/material_json/scan_json: generation config
 For each generated phantom, the generator also writes sidecar files next to the `.npz` unless disabled by flags:
 
 ```text
+metadata.json:              dataset-level manifest at the dataset root
 sample_XXXX_gt.json:       GT metadata with phantom/material/scan config, inclusion geometry, mask coverage, and stored array shapes
 sample_XXXX_phantom.gltf:  3D preview of the tetrahedral material assignment
 sample_XXXX_press_records/:
@@ -122,6 +125,8 @@ Newton/VBD is much slower than the analytic smoke backend. A tiny 3x3 scan with 
 ## Native Visualization
 
 The active visualization path is native Python/VTK rather than the removed browser phantom viewer.
+
+The metadata/data contract is documented in `docs/data_contract.md`; the fixed sample metadata shape is templated in `docs/metadata_template.json`.
 
 Analytic phantom attribute viewer:
 

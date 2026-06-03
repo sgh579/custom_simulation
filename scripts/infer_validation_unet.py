@@ -7,6 +7,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from palpation_sim.workflow import require_runtime_environment, resolve_required_torch_cuda_device
+
 
 def load_model_input(path: Path, input_mode: str) -> np.ndarray:
     with np.load(path) as sample:
@@ -38,13 +40,7 @@ def _load_fz_channels(sample: np.lib.npyio.NpzFile, path: Path) -> np.ndarray:
 
 
 def resolve_device(name: str) -> torch.device:
-    if name == "auto":
-        if torch.cuda.is_available():
-            return torch.device("cuda")
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            return torch.device("mps")
-        return torch.device("cpu")
-    return torch.device(name)
+    return resolve_required_torch_cuda_device(torch, name)
 
 
 def main() -> None:
@@ -54,8 +50,9 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True, help="Output .npy 0/1 mask.")
     parser.add_argument("--prob-output", type=Path, default=None, help="Optional .npy probability map.")
     parser.add_argument("--threshold", type=float, default=0.5)
-    parser.add_argument("--device", type=str, default="auto", choices=["auto", "cpu", "cuda", "mps"])
+    parser.add_argument("--device", type=str, default="cuda", help="Required CUDA device, e.g. cuda or cuda:0.")
     args = parser.parse_args()
+    require_runtime_environment()
 
     _load_ml_dependencies()
 

@@ -16,6 +16,7 @@ from .phantom import (
     material_arrays_for_lumps,
     normalize_lumps,
 )
+from .workflow import DEFAULT_NEWTON_ROOT, REQUIRED_NEWTON_DEVICE, require_runtime_environment
 
 
 class NewtonUnavailableError(RuntimeError):
@@ -32,11 +33,12 @@ class NewtonVBDPalpationSimulator:
         scan: ScanConfig,
         *,
         newton_root: str | Path | None = None,
-        device: str | None = None,
+        device: str | None = REQUIRED_NEWTON_DEVICE,
     ) -> None:
         self.phantom = phantom
         self.material = material
         self.scan = scan
+        require_runtime_environment(require_newton=True, newton_root=newton_root)
         self.newton, self.wp, self.SolverVBD = _import_newton(newton_root)
         self.device = _resolve_device(self.wp, device)
 
@@ -196,9 +198,12 @@ class NewtonVBDPalpationSimulator:
 
 def _import_newton(newton_root: str | Path | None) -> tuple[Any, Any, Any]:
     if newton_root is not None:
-        sys.path.insert(0, str(Path(newton_root).expanduser()))
+        root = Path(newton_root).expanduser()
+        if root != DEFAULT_NEWTON_ROOT:
+            raise NewtonUnavailableError(f"Newton root is pinned to {DEFAULT_NEWTON_ROOT}; got {root}")
+        sys.path.insert(0, str(root))
     else:
-        default_root = Path("/home/goodmansun/newton")
+        default_root = DEFAULT_NEWTON_ROOT
         if default_root.exists():
             sys.path.insert(0, str(default_root))
     try:
@@ -207,26 +212,40 @@ def _import_newton(newton_root: str | Path | None) -> tuple[Any, Any, Any]:
         from newton.solvers import SolverVBD  # type: ignore[import-not-found]
     except ImportError as exc:
         raise NewtonUnavailableError(
-            "Cannot import Newton/Warp. Run with /home/goodmansun/newton/.venv/bin/python "
-            "or pass --newton-root to the dataset generator."
+            "Cannot import Newton/Warp. This workflow expects conda env 'palpation' "
+            f"and Newton at {DEFAULT_NEWTON_ROOT}."
         ) from exc
     return newton, wp, SolverVBD
 
 
-def _resolve_device(wp: Any, device: str | None) -> str | None:
+def _resolve_device(wp: Any, device: str | None) -> str:
     if device is None or str(device).strip() == "":
-        return device
-    requested = str(device).strip()
-    if requested.lower() != "auto":
-        return requested
+        requested = REQUIRED_NEWTON_DEVICE
+    else:
+        requested = str(device).strip()
+    if requested.lower() == "auto":
+        raise RuntimeError(
+            "Device 'auto' is disabled for Newton/VBD simulation. "
+            f"Use the pinned GPU device '{REQUIRED_NEWTON_DEVICE}'."
+        )
+    if requested == "cuda":
+        requested = REQUIRED_NEWTON_DEVICE
+    if requested != REQUIRED_NEWTON_DEVICE:
+        raise RuntimeError(
+            f"Newton/VBD simulation is pinned to '{REQUIRED_NEWTON_DEVICE}' in this workflow; got '{requested}'."
+        )
+    if not requested.startswith("cuda"):
+        raise RuntimeError(
+            f"Newton/VBD simulation is GPU-only in this workflow; got device '{requested}'. "
+            f"Use '{REQUIRED_NEWTON_DEVICE}'."
+        )
     try:
         devices = [str(candidate) for candidate in wp.get_devices()]
-    except Exception:
-        return "cpu"
-    for candidate in devices:
-        if candidate.startswith("cuda"):
-            return candidate
-    return "cpu"
+    except Exception as exc:
+        raise RuntimeError(f"Cannot query Warp devices while requiring '{requested}'.") from exc
+    if requested not in devices:
+        raise RuntimeError(f"Required Warp CUDA device '{requested}' is not visible. Visible devices: {devices}")
+    return requested
 
 
 def _fix_bottom_particles(wp: Any, model: Any, bottom_mask: np.ndarray) -> None:

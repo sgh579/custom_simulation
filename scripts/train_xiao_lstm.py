@@ -11,6 +11,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from palpation_sim.workflow import require_runtime_environment, resolve_required_torch_cuda_device
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train Xiao et al. 2020-style LSTM depth classifier.")
@@ -30,7 +32,7 @@ def main() -> None:
     parser.add_argument("--val-fraction", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--num-workers", type=int, default=0)
-    parser.add_argument("--device", type=str, default="auto", choices=["auto", "cpu", "cuda", "mps"])
+    parser.add_argument("--device", type=str, default="cuda", help="Required CUDA device, e.g. cuda or cuda:0.")
     parser.add_argument(
         "--max-minutes",
         type=float,
@@ -41,6 +43,7 @@ def main() -> None:
     parser.add_argument("--early-stop-patience", type=int, default=None)
     parser.add_argument("--early-stop-min-delta", type=float, default=1e-4)
     args = parser.parse_args()
+    require_runtime_environment()
 
     _load_ml_dependencies()
 
@@ -244,13 +247,7 @@ def run_epoch(
 
 
 def resolve_device(name: str):
-    if name == "auto":
-        if torch.cuda.is_available():
-            return torch.device("cuda")
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            return torch.device("mps")
-        return torch.device("cpu")
-    return torch.device(name)
+    return resolve_required_torch_cuda_device(torch, name)
 
 
 def _load_ml_dependencies() -> None:

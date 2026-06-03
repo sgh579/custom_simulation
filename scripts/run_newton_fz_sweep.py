@@ -20,6 +20,13 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from palpation_sim.config import MaterialConfig, PhantomConfig, ScanConfig
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
 from palpation_sim.phantom import LumpSpec
+from palpation_sim.workflow import (
+    DEFAULT_NEWTON_ROOT,
+    REQUIRED_NEWTON_DEVICE,
+    metadata_contract,
+    require_runtime_environment,
+    runtime_metadata,
+)
 
 
 MM = 1.0e-3
@@ -71,8 +78,8 @@ class SweepCase:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run focused Newton/VBD F-z sweeps on the fixed-cylinder phantom.")
     parser.add_argument("--out-dir", type=Path, default=Path("runs/newton_fz_sweeps/fixed_four"))
-    parser.add_argument("--newton-root", type=Path, default=Path("/home/guoheng/newton"))
-    parser.add_argument("--device", type=str, default="auto")
+    parser.add_argument("--newton-root", type=Path, default=DEFAULT_NEWTON_ROOT, help="Pinned Newton source root.")
+    parser.add_argument("--device", type=str, default=REQUIRED_NEWTON_DEVICE, help="Pinned Warp/Newton CUDA device.")
     parser.add_argument("--target", choices=[*TARGET_POINTS_MM.keys(), "all"], default="top_lump")
     parser.add_argument("--case-preset", choices=["quick", "probe", "stiffness", "convergence"], default="quick")
 
@@ -86,6 +93,7 @@ def main() -> None:
     parser.add_argument("--lump-stiffness-multiplier", type=float, default=100.0)
     parser.add_argument("--no-save-samples", action="store_true")
     args = parser.parse_args()
+    require_runtime_environment(require_newton=True, newton_root=args.newton_root)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     cases = _preset_cases(args.case_preset)
@@ -99,6 +107,24 @@ def main() -> None:
 
     _write_summary(args.out_dir / "summary.csv", summaries)
     _write_json(args.out_dir / "summary.json", {"cases": summaries})
+    _write_json(
+        args.out_dir / "metadata.json",
+        {
+            "schema_name": "newton_fz_sweep_metadata",
+            "schema_version": 1,
+            "data_contract": metadata_contract(),
+            "runtime": runtime_metadata(newton_root=args.newton_root, device=args.device),
+            "backend": "newton_vbd",
+            "phantom_design": "fixed_four_cylinder",
+            "files": {
+                "summary_json": "summary.json",
+                "summary_csv": "summary.csv",
+                "plot": "fz_curves.png",
+                "sample_npz_pattern": "{target}/{case_label}.npz",
+            },
+            "cases": summaries,
+        },
+    )
     _plot_curves(args.out_dir / "fz_curves.png", summaries)
     print(f"done: wrote {len(summaries)} cases to {args.out_dir}", flush=True)
 

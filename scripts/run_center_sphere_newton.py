@@ -24,6 +24,7 @@ from palpation_sim.phantom import (
     material_arrays_for_lumps,
     mask_for_scan_grid,
 )
+from palpation_sim.workflow import DEFAULT_NEWTON_ROOT, REQUIRED_NEWTON_DEVICE, require_runtime_environment
 
 
 MM = 1.0e-3
@@ -48,8 +49,8 @@ class ChunkScanConfig(ScanConfig):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate a centered-sphere Newton/VBD palpation sample.")
     parser.add_argument("--out-dir", type=Path, default=Path("runs/center_sphere_newton_vbd_48x48x32_scan20x20"))
-    parser.add_argument("--newton-root", type=Path, default=Path("/home/guoheng/newton"))
-    parser.add_argument("--device", type=str, default="auto")
+    parser.add_argument("--newton-root", type=Path, default=DEFAULT_NEWTON_ROOT, help="Pinned Newton source root.")
+    parser.add_argument("--device", type=str, default=REQUIRED_NEWTON_DEVICE, help="Pinned Warp/Newton CUDA device.")
     parser.add_argument("--row-chunk-size", type=int, default=1)
     parser.add_argument("--row-start", type=int, default=0)
     parser.add_argument("--row-end", type=int, default=None)
@@ -76,6 +77,7 @@ def main() -> None:
     parser.add_argument("--sphere-radius-mm", type=float, default=10.0)
     parser.add_argument("--stiffness-multiplier", type=float, default=100.0)
     args = parser.parse_args()
+    require_runtime_environment(require_newton=True, newton_root=args.newton_root)
 
     phantom = _phantom(args)
     material = _material(args)
@@ -221,6 +223,7 @@ def _assemble(
         lumps=lumps,
         sample=sample,
         npz_path=npz_path,
+        metadata_path=metadata_path,
     )
     metadata["center_sphere_run"] = {
         "requested_backend": "newton_vbd",

@@ -9,6 +9,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from palpation_sim.workflow import require_runtime_environment, resolve_required_torch_cuda_device
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate validation U-Net and save visual outputs.")
@@ -21,8 +23,9 @@ def main() -> None:
     parser.add_argument("--sweep-max", type=float, default=0.9)
     parser.add_argument("--sweep-step", type=float, default=0.05)
     parser.add_argument("--max-images", type=int, default=12)
-    parser.add_argument("--device", type=str, default="auto", choices=["auto", "cpu", "cuda", "mps"])
+    parser.add_argument("--device", type=str, default="cuda", help="Required CUDA device, e.g. cuda or cuda:0.")
     args = parser.parse_args()
+    require_runtime_environment()
 
     _load_dependencies()
 
@@ -126,8 +129,8 @@ def _load_dependencies() -> None:
         from palpation_sim.models import ValidationUNet as model_cls
     except ModuleNotFoundError as exc:
         raise SystemExit(
-            "PyTorch/Numpy/Matplotlib dependencies are required for evaluation. Use: "
-            "/home/goodmansun/miniconda3/envs/torchnightly/bin/python scripts/evaluate_validation_unet.py ..."
+            "PyTorch/Numpy/Matplotlib dependencies are required for evaluation. "
+            "Run this script from the conda environment 'palpation'."
         ) from exc
 
     np = np_mod
@@ -138,13 +141,7 @@ def _load_dependencies() -> None:
 
 
 def _resolve_device(name: str):
-    if name == "auto":
-        if torch.cuda.is_available():
-            return torch.device("cuda")
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            return torch.device("mps")
-        return torch.device("cpu")
-    return torch.device(name)
+    return resolve_required_torch_cuda_device(torch, name)
 
 
 def _empty_counts() -> dict[str, int]:

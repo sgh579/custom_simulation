@@ -13,6 +13,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from palpation_sim.analytic import run_analytic_sample
 from palpation_sim.config import MaterialConfig, PhantomConfig, ScanConfig
 from palpation_sim.exports import (
+    build_dataset_metadata,
     build_ground_truth_metadata,
     write_ground_truth_metadata,
     write_phantom_gltf,
@@ -22,6 +23,7 @@ from palpation_sim.exports import (
 from palpation_sim.features import extract_feature_map
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
 from palpation_sim.phantom import mask_for_scan_grid, sample_lumps
+from palpation_sim.workflow import DEFAULT_NEWTON_ROOT, REQUIRED_NEWTON_DEVICE, require_runtime_environment
 
 
 def main() -> None:
@@ -37,7 +39,6 @@ def main() -> None:
         help="Skip samples whose .npz already exists while still advancing the sampler for deterministic continuation.",
     )
     parser.add_argument("--save-features", action="store_true", help="Also store engineered feature maps.")
-    parser.add_argument("--no-save-gt-json", action="store_true", help="Do not write per-phantom GT metadata JSON files.")
     parser.add_argument("--no-save-phantom-3d", action="store_true", help="Do not write per-phantom glTF 3D preview files.")
     parser.add_argument(
         "--no-save-press-records",
@@ -101,10 +102,11 @@ def main() -> None:
     parser.add_argument("--allow-z-overlap", action="store_true", help="Allow z intervals of lumps to overlap.")
     parser.add_argument("--z-gap", type=float, default=0.0, help="Required gap between lump z intervals [m].")
 
-    parser.add_argument("--newton-root", type=Path, default=Path("/home/goodmansun/newton"))
-    parser.add_argument("--device", type=str, default=None, help="Warp/Newton device, e.g. cpu or cuda:0.")
+    parser.add_argument("--newton-root", type=Path, default=DEFAULT_NEWTON_ROOT, help="Pinned Newton source root.")
+    parser.add_argument("--device", type=str, default=REQUIRED_NEWTON_DEVICE, help="Pinned Warp/Newton CUDA device.")
     parser.add_argument("--allow-empty-mask", action="store_true", help="Allow sampled lumps that miss all scan cells.")
     args = parser.parse_args()
+    require_runtime_environment(require_newton=args.backend == "newton", newton_root=args.newton_root)
 
     rng = np.random.default_rng(args.seed)
     phantom = PhantomConfig(
@@ -147,6 +149,17 @@ def main() -> None:
 
     split_counts = {"train": args.num_train, "val": args.num_val}
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    dataset_metadata = build_dataset_metadata(
+        dataset_id=args.out_dir.name,
+        backend=args.backend,
+        seed=args.seed,
+        phantom=phantom,
+        material=material,
+        scan=scan,
+        split_counts=split_counts,
+        args=vars(args),
+    )
+    write_ground_truth_metadata(args.out_dir / "metadata.json", dataset_metadata)
     for split, count in split_counts.items():
         split_dir = args.out_dir / split
         split_dir.mkdir(parents=True, exist_ok=True)
@@ -200,7 +213,7 @@ def main() -> None:
                 sample["features"] = extract_feature_map(sample["presses"])  # type: ignore[arg-type]
 
             gltf_path = None if args.no_save_phantom_3d else split_dir / f"sample_{sample_idx:04d}_phantom.gltf"
-            gt_path = None if args.no_save_gt_json else split_dir / f"sample_{sample_idx:04d}_gt.json"
+            gt_path = split_dir / f"sample_{sample_idx:04d}_gt.json"
             press_records_dir = None if args.no_save_press_records else split_dir / f"sample_{sample_idx:04d}_press_records"
             scan_animation_path = (
                 None if args.no_save_scan_animation else split_dir / f"sample_{sample_idx:04d}_scan_animation.html"
@@ -214,6 +227,7 @@ def main() -> None:
                 lumps=lumps,
                 sample=sample,
                 npz_path=out_path,
+                metadata_path=gt_path,
                 gltf_path=gltf_path,
                 press_records_dir=press_records_dir,
                 scan_animation_path=scan_animation_path,
@@ -230,8 +244,7 @@ def main() -> None:
                     sample_id=f"sample_{sample_idx:04d}",
                     split=split,
                 )
-            if gt_path is not None:
-                write_ground_truth_metadata(gt_path, metadata)
+            write_ground_truth_metadata(gt_path, metadata)
             print(f"[{split}] wrote {out_path}")
 
 def _parse_shapes(raw: str) -> tuple[str, ...]:

@@ -32,6 +32,7 @@ from palpation_sim.exports import (
 from palpation_sim.features import extract_feature_map
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
 from palpation_sim.phantom import LumpSpec, create_structured_tet_mesh, material_arrays_for_lumps
+from palpation_sim.workflow import DEFAULT_NEWTON_ROOT, REQUIRED_NEWTON_DEVICE, require_runtime_environment
 
 
 MM = 1.0e-3
@@ -50,7 +51,6 @@ FIXED_LUMP_CENTERS_M = (
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the fixed four-cylinder palpation POC.")
     parser.add_argument("--out-dir", type=Path, default=Path("runs/fixed_four_cylinder_poc"))
-    parser.add_argument("--allow-newton-missing", action="store_true")
     parser.add_argument("--smoke", action="store_true", help="Use tiny meshes/grids for a quick script check.")
     parser.add_argument("--no-press-records", action="store_true")
     parser.add_argument("--no-visualization", action="store_true")
@@ -60,8 +60,8 @@ def main() -> None:
     parser.add_argument("--newton-grid", type=int, default=5)
     parser.add_argument("--newton-substeps", type=int, default=3)
     parser.add_argument("--newton-vbd-iterations", type=int, default=5)
-    parser.add_argument("--newton-root", type=Path, default=Path("/home/guoheng/newton"))
-    parser.add_argument("--newton-device", type=str, default="auto")
+    parser.add_argument("--newton-root", type=Path, default=DEFAULT_NEWTON_ROOT, help="Pinned Newton source root.")
+    parser.add_argument("--newton-device", type=str, default=REQUIRED_NEWTON_DEVICE, help="Pinned Warp/Newton CUDA device.")
     parser.add_argument("--newton-k-mu", type=float, default=MaterialConfig.k_mu)
     parser.add_argument("--newton-k-lambda", type=float, default=MaterialConfig.k_lambda)
     parser.add_argument("--newton-soft-contact-ke", type=float, default=MaterialConfig.soft_contact_ke)
@@ -72,6 +72,7 @@ def main() -> None:
     parser.add_argument("--probe-diameter-mm", type=float, default=8.0)
     parser.add_argument("--edge-margin-mm", type=float, default=4.0)
     args = parser.parse_args()
+    require_runtime_environment(require_newton=True, newton_root=args.newton_root)
     if args.smoke:
         _apply_smoke_overrides(args)
 
@@ -82,18 +83,7 @@ def main() -> None:
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     run_summaries: list[dict[str, object]] = []
-    try:
-        run_summaries.append(_run_newton(args, material, lumps))
-    except Exception as exc:
-        if not args.allow_newton_missing:
-            raise
-        failure = {
-            "run": "newton_poc",
-            "status": "skipped",
-            "reason": f"{type(exc).__name__}: {exc}",
-        }
-        run_summaries.append(failure)
-        _write_json(args.out_dir / "newton_poc_skipped.json", failure)
+    run_summaries.append(_run_newton(args, material, lumps))
 
     _write_json(
         args.out_dir / "summary.json",
@@ -227,6 +217,7 @@ def _write_run_outputs(
         lumps=lumps,
         sample=sample,
         npz_path=npz_path,
+        metadata_path=metadata_path,
         gltf_path=gltf_path,
         press_records_dir=press_dir,
         scan_animation_path=animation_path,

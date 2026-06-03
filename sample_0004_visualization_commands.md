@@ -3,7 +3,7 @@
 样本前缀：
 
 ```bash
-/home/goodmansun/custom_simulation/data/newton_4lump_33x33_32steps_40_8/train/sample_0004
+/home/guoheng/custom_simulation/data/newton_4lump_33x33_32steps_40_8/train/sample_0004
 ```
 
 ## 0. Native 可视化路线（当前优先）
@@ -11,7 +11,7 @@
 先更新环境，安装 PyVista/VTK/PySide6/PyVistaQt：
 
 ```bash
-cd /home/goodmansun/custom_simulation
+cd /home/guoheng/custom_simulation
 conda env update -f environment.yml --prune
 conda activate palpation
 ```
@@ -20,7 +20,7 @@ conda activate palpation
 
 ```bash
 python scripts/view_phantom_native.py \
-  /home/goodmansun/custom_simulation/data/newton_4lump_33x33_32steps_40_8/train/sample_0004_gt.json \
+  /home/guoheng/custom_simulation/data/newton_4lump_33x33_32steps_40_8/train/sample_0004_gt.json \
   --resolution 72
 ```
 
@@ -28,8 +28,8 @@ python scripts/view_phantom_native.py \
 
 ```bash
 python scripts/export_native_vtk.py \
-  /home/goodmansun/custom_simulation/data/newton_4lump_33x33_32steps_40_8/train/sample_0004.npz \
-  --out-dir /home/goodmansun/custom_simulation/data/newton_4lump_33x33_32steps_40_8/train/sample_0004_vtk \
+  /home/guoheng/custom_simulation/data/newton_4lump_33x33_32steps_40_8/train/sample_0004.npz \
+  --out-dir /home/guoheng/custom_simulation/data/newton_4lump_33x33_32steps_40_8/train/sample_0004_vtk \
   --extract-surface \
   --timeseries-row 16 \
   --timeseries-col 16 \
@@ -40,7 +40,7 @@ python scripts/export_native_vtk.py \
 
 ```bash
 python scripts/play_press_native.py \
-  /home/goodmansun/custom_simulation/data/newton_4lump_33x33_32steps_40_8/train/sample_0004.npz \
+  /home/guoheng/custom_simulation/data/newton_4lump_33x33_32steps_40_8/train/sample_0004.npz \
   --surface-resolution 128
 ```
 
@@ -48,7 +48,7 @@ FEM-style 离散 mesh 按压播放器：
 
 ```bash
 python scripts/play_press_native.py \
-  /home/goodmansun/custom_simulation/data/newton_4lump_33x33_32steps_40_8/train/sample_0004.npz \
+  /home/guoheng/custom_simulation/data/newton_4lump_33x33_32steps_40_8/train/sample_0004.npz \
   --mesh-style discrete \
   --tet-stride 64 \
   --vertex-stride 16
