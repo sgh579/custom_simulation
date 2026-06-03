@@ -20,6 +20,22 @@ conda run -n palpation python <script> ...
 
 Newton is loaded from `/home/guoheng/newton`. Newton/VBD simulation is pinned to GPU device `cuda:0`; scripts must fail early if that device is not visible to Warp.
 
+## Run Directory Naming
+
+Fresh outputs written under `runs/` must use a date prefix on the run directory leaf:
+
+```text
+runs/<yyyymmdd-hhmmss>-<run_name>/
+```
+
+For nested run groups, prefix the leaf directory:
+
+```text
+runs/newton_fz_sweeps/<yyyymmdd-hhmmss>-fixed_four/
+```
+
+The prefix is local wall-clock time in `yyyymmdd-hhmmss` format. Resume or assemble-only workflows may target an existing directory and should not add a new prefix.
+
 ## Simulator Boundary
 
 Phantom-specific scripts may define geometry, lump layout, scan grids, and material parameters. They must not fork or reimplement solver stepping. Newton simulation logic lives in:
@@ -93,6 +109,11 @@ Important fields:
 runtime.python.environment_name   must be palpation
 runtime.newton.root               must be /home/guoheng/newton
 runtime.device.required           must be cuda:0
+run.date_prefix                    run directory prefix in yyyymmdd-hhmmss format when under runs/
+run.output_dir                     output directory used by the writer
+resource_usage.elapsed_seconds     elapsed wall-clock seconds for the sample/case/dataset
+resource_usage.gpu_memory          nvidia-smi memory.used observations in bytes
+resource_usage.disk_usage          final saved file sizes in bytes and allocated bytes
 files.npz                         primary numeric sample file
 files.phantom_3d                  glTF preview if generated
 files.press_records               press-record directory if generated
@@ -100,6 +121,10 @@ phantom/material/scan             full configuration used by the run
 lumps                             analytic lump definitions
 arrays                            shape and dtype of every NPZ array
 ```
+
+`resource_usage.gpu_memory` records full-device `memory.used` from `nvidia-smi` before, during, and after the run. The field includes `peak_delta_from_start_bytes` as a best-effort per-run delta, but full-device usage can include other processes on the same GPU.
+
+Every generated case or sample metadata file must include `resource_usage`. Multi-case dataset manifests must also include dataset-level `resource_usage`; when the dataset stores per-case records in one top-level manifest, each case entry must carry its own `resource_usage`.
 
 ## Native 3D Player Inputs
 

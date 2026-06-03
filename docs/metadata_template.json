@@ -1,8 +1,8 @@
 {
   "schema_name": "palpation_sample_metadata",
-  "schema_version": 2,
+  "schema_version": 3,
   "data_contract": {
-    "version": 1,
+    "version": 2,
     "definition": "docs/data_contract.md",
     "template": "docs/metadata_template.json"
   },
@@ -20,6 +20,40 @@
     "device": {
       "required": "cuda:0",
       "requested": "cuda:0"
+    }
+  },
+  "run": {
+    "output_dir": "<absolute or repository-relative run directory>",
+    "directory_name": "<yyyymmdd-hhmmss-run-name>",
+    "date_prefix": "<yyyymmdd-hhmmss or null>",
+    "date_prefixed_directory": "<directory containing the date prefix or null>",
+    "date_prefix_format": "yyyymmdd-hhmmss"
+  },
+  "resource_usage": {
+    "elapsed_seconds": 0.0,
+    "started_at_local": "<ISO-8601 local timestamp>",
+    "finished_at_local": "<ISO-8601 local timestamp>",
+    "gpu_memory": {
+      "available": true,
+      "device": "cuda:0",
+      "query_method": "nvidia-smi memory.used polling",
+      "unit": "bytes",
+      "before_used_bytes": 0,
+      "peak_observed_used_bytes": 0,
+      "after_used_bytes": 0,
+      "peak_delta_from_start_bytes": 0,
+      "poll_interval_seconds": 0.2,
+      "sample_count": 0,
+      "query_error": null,
+      "note": "memory.used is full-device usage reported by nvidia-smi and can include other processes."
+    },
+    "disk_usage": {
+      "root": "<output directory or file when singular>",
+      "roots": [],
+      "file_count": 0,
+      "total_bytes": 0,
+      "total_allocated_bytes": 0,
+      "files": {}
     }
   },
   "units": {

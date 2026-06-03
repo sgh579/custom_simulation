@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from palpation_sim.config import MaterialConfig, PhantomConfig, ScanConfig
-from palpation_sim.exports import build_ground_truth_metadata, write_ground_truth_metadata
+from palpation_sim.exports import build_ground_truth_metadata, write_metadata_with_resource_usage
 from palpation_sim.features import extract_feature_map
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
 from palpation_sim.phantom import (
@@ -24,7 +24,13 @@ from palpation_sim.phantom import (
     material_arrays_for_lumps,
     mask_for_scan_grid,
 )
-from palpation_sim.workflow import DEFAULT_NEWTON_ROOT, REQUIRED_NEWTON_DEVICE, require_runtime_environment
+from palpation_sim.workflow import (
+    DEFAULT_NEWTON_ROOT,
+    REQUIRED_NEWTON_DEVICE,
+    ResourceMonitor,
+    require_runtime_environment,
+    with_run_date_prefix,
+)
 
 
 MM = 1.0e-3
@@ -78,6 +84,7 @@ def main() -> None:
     parser.add_argument("--stiffness-multiplier", type=float, default=100.0)
     args = parser.parse_args()
     require_runtime_environment(require_newton=True, newton_root=args.newton_root)
+    args.out_dir = with_run_date_prefix(args.out_dir, enabled=not args.resume and not args.assemble_only)
 
     phantom = _phantom(args)
     material = _material(args)
@@ -85,14 +92,17 @@ def main() -> None:
     lump = _center_sphere(phantom, args)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    print(f"output dir: {args.out_dir}", flush=True)
     chunk_dir = args.out_dir / "chunks"
     chunk_dir.mkdir(parents=True, exist_ok=True)
     _write_run_config(args.out_dir / "run_config.json", args, phantom, material, scan, [lump])
 
+    monitor = ResourceMonitor(device=args.device).start() if not args.no_assemble else None
     if not args.assemble_only:
         _run_chunks(args, phantom, material, scan, [lump], chunk_dir)
     if not args.no_assemble:
-        _assemble(args, phantom, material, scan, [lump], chunk_dir)
+        assert monitor is not None
+        _assemble(args, phantom, material, scan, [lump], chunk_dir, monitor)
 
 
 def _run_chunks(
@@ -155,6 +165,7 @@ def _assemble(
     scan: ScanConfig,
     lumps: Sequence[LumpSpec],
     chunk_dir: Path,
+    monitor: ResourceMonitor,
 ) -> None:
     mesh = create_structured_tet_mesh(phantom)
     _k_mu, _k_lambda, _k_damp, tet_lump_mask, tet_lump_id = material_arrays_for_lumps(mesh, material, lumps)
@@ -238,9 +249,10 @@ def _assemble(
         "stiffness_multiplier": float(args.stiffness_multiplier),
         "chunk_elapsed_seconds": chunk_elapsed,
     }
-    write_ground_truth_metadata(metadata_path, metadata)
     _write_curve_summary(args.out_dir / "curve_summary.csv", sample)
-    _write_summary(args.out_dir / "summary.json", sample, npz_path, metadata_path, chunk_elapsed)
+    resource_usage = monitor.finish(storage_root=args.out_dir)
+    _write_summary(args.out_dir / "summary.json", sample, npz_path, metadata_path, chunk_elapsed, resource_usage)
+    write_metadata_with_resource_usage(metadata_path, metadata, resource_usage, storage_root=args.out_dir)
     print(f"assembled {npz_path}", flush=True)
 
 
@@ -366,6 +378,7 @@ def _write_summary(
     npz_path: Path,
     metadata_path: Path,
     chunk_elapsed: Sequence[float],
+    resource_usage: dict[str, object],
 ) -> None:
     fz = np.asarray(sample["fz"], dtype=np.float32)
     depth = np.asarray(sample["indentation_depth"], dtype=np.float32)
@@ -385,6 +398,7 @@ def _write_summary(
         "chunk_count": len(chunk_elapsed),
         "chunk_elapsed_seconds": [float(v) for v in chunk_elapsed],
         "total_chunk_elapsed_seconds": float(sum(chunk_elapsed)),
+        "resource_usage": resource_usage,
     }
     path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
 

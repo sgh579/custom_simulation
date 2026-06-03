@@ -16,6 +16,7 @@ from palpation_sim.exports import (
     build_dataset_metadata,
     build_ground_truth_metadata,
     write_ground_truth_metadata,
+    write_metadata_with_resource_usage,
     write_phantom_gltf,
     write_press_records,
     write_scan_animation_html,
@@ -23,7 +24,13 @@ from palpation_sim.exports import (
 from palpation_sim.features import extract_feature_map
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
 from palpation_sim.phantom import mask_for_scan_grid, sample_lumps
-from palpation_sim.workflow import DEFAULT_NEWTON_ROOT, REQUIRED_NEWTON_DEVICE, require_runtime_environment
+from palpation_sim.workflow import (
+    DEFAULT_NEWTON_ROOT,
+    REQUIRED_NEWTON_DEVICE,
+    ResourceMonitor,
+    require_runtime_environment,
+    with_run_date_prefix,
+)
 
 
 def main() -> None:
@@ -107,6 +114,7 @@ def main() -> None:
     parser.add_argument("--allow-empty-mask", action="store_true", help="Allow sampled lumps that miss all scan cells.")
     args = parser.parse_args()
     require_runtime_environment(require_newton=args.backend == "newton", newton_root=args.newton_root)
+    args.out_dir = with_run_date_prefix(args.out_dir, enabled=not args.resume)
 
     rng = np.random.default_rng(args.seed)
     phantom = PhantomConfig(
@@ -149,6 +157,8 @@ def main() -> None:
 
     split_counts = {"train": args.num_train, "val": args.num_val}
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    print(f"output dir: {args.out_dir}", flush=True)
+    dataset_monitor = ResourceMonitor(device=args.device if args.backend == "newton" else None).start()
     dataset_metadata = build_dataset_metadata(
         dataset_id=args.out_dir.name,
         backend=args.backend,
@@ -158,6 +168,7 @@ def main() -> None:
         scan=scan,
         split_counts=split_counts,
         args=vars(args),
+        out_dir=args.out_dir,
     )
     write_ground_truth_metadata(args.out_dir / "metadata.json", dataset_metadata)
     for split, count in split_counts.items():
@@ -200,6 +211,7 @@ def main() -> None:
             if args.resume and out_path.exists():
                 print(f"[{split}] skip existing {out_path}")
                 continue
+            monitor = ResourceMonitor(device=args.device if args.backend == "newton" else None).start()
             if args.backend == "newton":
                 assert simulator is not None
                 sample = simulator.run_sample(lumps)
@@ -244,8 +256,24 @@ def main() -> None:
                     sample_id=f"sample_{sample_idx:04d}",
                     split=split,
                 )
-            write_ground_truth_metadata(gt_path, metadata)
+            resource_usage = monitor.finish(
+                storage_root=(out_path, gt_path, gltf_path, press_records_dir, scan_animation_path)
+            )
+            write_metadata_with_resource_usage(
+                gt_path,
+                metadata,
+                resource_usage,
+                storage_root=(out_path, gt_path, gltf_path, press_records_dir, scan_animation_path),
+            )
             print(f"[{split}] wrote {out_path}")
+
+    dataset_resource_usage = dataset_monitor.finish(storage_root=args.out_dir)
+    write_metadata_with_resource_usage(
+        args.out_dir / "metadata.json",
+        dataset_metadata,
+        dataset_resource_usage,
+        storage_root=args.out_dir,
+    )
 
 def _parse_shapes(raw: str) -> tuple[str, ...]:
     allowed = {"sphere", "ellipsoid", "box", "cylinder", "capsule"}

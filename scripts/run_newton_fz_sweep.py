@@ -5,7 +5,6 @@ import csv
 import json
 import os
 import sys
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -20,12 +19,16 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from palpation_sim.config import MaterialConfig, PhantomConfig, ScanConfig
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
 from palpation_sim.phantom import LumpSpec
+from palpation_sim.exports import write_metadata_with_resource_usage
 from palpation_sim.workflow import (
     DEFAULT_NEWTON_ROOT,
     REQUIRED_NEWTON_DEVICE,
+    ResourceMonitor,
     metadata_contract,
     require_runtime_environment,
+    run_output_metadata,
     runtime_metadata,
+    with_run_date_prefix,
 )
 
 
@@ -94,12 +97,15 @@ def main() -> None:
     parser.add_argument("--no-save-samples", action="store_true")
     args = parser.parse_args()
     require_runtime_environment(require_newton=True, newton_root=args.newton_root)
+    args.out_dir = with_run_date_prefix(args.out_dir)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    print(f"output dir: {args.out_dir}", flush=True)
     cases = _preset_cases(args.case_preset)
     targets = TARGET_POINTS_MM.items() if args.target == "all" else [(args.target, TARGET_POINTS_MM[args.target])]
 
     summaries: list[dict[str, object]] = []
+    run_monitor = ResourceMonitor(device=args.device).start()
     for target_name, point_mm in targets:
         for case in cases:
             print(f"running {target_name}/{case.label}...", flush=True)
@@ -107,25 +113,25 @@ def main() -> None:
 
     _write_summary(args.out_dir / "summary.csv", summaries)
     _write_json(args.out_dir / "summary.json", {"cases": summaries})
-    _write_json(
-        args.out_dir / "metadata.json",
-        {
-            "schema_name": "newton_fz_sweep_metadata",
-            "schema_version": 1,
-            "data_contract": metadata_contract(),
-            "runtime": runtime_metadata(newton_root=args.newton_root, device=args.device),
-            "backend": "newton_vbd",
-            "phantom_design": "fixed_four_cylinder",
-            "files": {
-                "summary_json": "summary.json",
-                "summary_csv": "summary.csv",
-                "plot": "fz_curves.png",
-                "sample_npz_pattern": "{target}/{case_label}.npz",
-            },
-            "cases": summaries,
-        },
-    )
     _plot_curves(args.out_dir / "fz_curves.png", summaries)
+    run_resource_usage = run_monitor.finish(storage_root=args.out_dir)
+    metadata = {
+        "schema_name": "newton_fz_sweep_metadata",
+        "schema_version": 2,
+        "data_contract": metadata_contract(),
+        "runtime": runtime_metadata(newton_root=args.newton_root, device=args.device),
+        "run": run_output_metadata(args.out_dir),
+        "backend": "newton_vbd",
+        "phantom_design": "fixed_four_cylinder",
+        "files": {
+            "summary_json": "summary.json",
+            "summary_csv": "summary.csv",
+            "plot": "fz_curves.png",
+            "sample_npz_pattern": "{target}/{case_label}.npz",
+        },
+        "cases": summaries,
+    }
+    write_metadata_with_resource_usage(args.out_dir / "metadata.json", metadata, run_resource_usage, storage_root=args.out_dir)
     print(f"done: wrote {len(summaries)} cases to {args.out_dir}", flush=True)
 
 
@@ -165,9 +171,8 @@ def _run_case(
         device=args.device,
     )
 
-    start = time.time()
+    monitor = ResourceMonitor(device=args.device).start()
     sample = simulator.run_sample(_fixed_lumps(float(args.lump_stiffness_multiplier)))
-    elapsed = time.time() - start
     depth = np.asarray(sample["indentation_depth"][0, 0], dtype=np.float32)
     force = np.asarray(sample["fz"][0, 0], dtype=np.float32)
     metrics = _curve_metrics(depth, force)
@@ -178,12 +183,15 @@ def _run_case(
         sample_dir.mkdir(parents=True, exist_ok=True)
         sample_path = sample_dir / f"{case.label}.npz"
         np.savez_compressed(sample_path, **sample)
+    storage_root = sample_path if sample_path is not None else args.out_dir
+    resource_usage = monitor.finish(storage_root=storage_root)
 
     return {
         "target": target_name,
         "point_mm": [float(point_mm[0]), float(point_mm[1])],
         "label": case.label,
-        "elapsed_seconds": float(elapsed),
+        "elapsed_seconds": float(resource_usage["elapsed_seconds"]),
+        "resource_usage": resource_usage,
         "sample": str(sample_path) if sample_path is not None else None,
         "cells": [int(phantom.cells_x), int(phantom.cells_y), int(phantom.cells_z)],
         "particle_radius_mm": float(phantom.particle_radius * 1000.0),

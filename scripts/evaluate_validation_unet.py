@@ -9,7 +9,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from palpation_sim.workflow import require_runtime_environment, resolve_required_torch_cuda_device
+from palpation_sim.workflow import require_runtime_environment, resolve_required_torch_cuda_device, with_run_date_prefix
 
 
 def main() -> None:
@@ -26,6 +26,7 @@ def main() -> None:
     parser.add_argument("--device", type=str, default="cuda", help="Required CUDA device, e.g. cuda or cuda:0.")
     args = parser.parse_args()
     require_runtime_environment()
+    args.out_dir = with_run_date_prefix(args.out_dir)
 
     _load_dependencies()
 

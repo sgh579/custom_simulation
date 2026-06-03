@@ -13,8 +13,10 @@ from .phantom import LumpSpec, create_structured_tet_mesh, material_arrays_for_l
 from .workflow import (
     DATASET_METADATA_SCHEMA_VERSION,
     SAMPLE_METADATA_SCHEMA_VERSION,
+    disk_usage_metadata,
     json_ready,
     metadata_contract,
+    run_output_metadata,
     runtime_metadata,
 )
 
@@ -39,11 +41,13 @@ def build_ground_truth_metadata(
 ) -> dict[str, object]:
     """Create a JSON-friendly metadata record for one generated phantom."""
     lump_list = normalize_lumps(lumps)
+    run_dir = metadata_path.parent if metadata_path is not None else npz_path.parent if npz_path is not None else None
     metadata: dict[str, object] = {
         "schema_name": "palpation_sample_metadata",
         "schema_version": SAMPLE_METADATA_SCHEMA_VERSION,
         "data_contract": metadata_contract(),
         "runtime": runtime_metadata(),
+        "run": run_output_metadata(run_dir) if run_dir is not None else None,
         "units": {
             "length": "m",
             "force": "N",
@@ -105,12 +109,14 @@ def build_dataset_metadata(
     scan: ScanConfig,
     split_counts: dict[str, int],
     args: dict[str, object],
+    out_dir: Path | None = None,
 ) -> dict[str, object]:
     return {
         "schema_name": "palpation_dataset_metadata",
         "schema_version": DATASET_METADATA_SCHEMA_VERSION,
         "data_contract": metadata_contract(),
         "runtime": runtime_metadata(),
+        "run": run_output_metadata(out_dir) if out_dir is not None else None,
         "dataset_id": dataset_id,
         "backend": backend,
         "seed": int(seed),
@@ -246,6 +252,27 @@ def write_ground_truth_metadata(path: Path, metadata: dict[str, object]) -> None
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, sort_keys=True)
+
+
+def write_metadata_with_resource_usage(
+    path: Path,
+    metadata: dict[str, object],
+    resource_usage: dict[str, object],
+    *,
+    storage_root: Path | list[Path | None] | tuple[Path | None, ...],
+) -> None:
+    """Write metadata and refresh disk usage to include the metadata file."""
+    previous_disk_usage: dict[str, object] | None = None
+    for _ in range(4):
+        metadata["resource_usage"] = resource_usage
+        write_ground_truth_metadata(path, metadata)
+        disk_usage = disk_usage_metadata(storage_root)
+        resource_usage["disk_usage"] = disk_usage
+        if disk_usage == previous_disk_usage:
+            break
+        previous_disk_usage = disk_usage
+    metadata["resource_usage"] = resource_usage
+    write_ground_truth_metadata(path, metadata)
 
 
 def _require_sample_array(sample: dict[str, object], key: str) -> np.ndarray:

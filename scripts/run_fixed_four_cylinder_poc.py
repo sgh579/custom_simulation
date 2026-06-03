@@ -26,13 +26,20 @@ from palpation_sim.exports import (
     _selected_tet_wire_geometry,
     _surface_wire_geometry,
     build_ground_truth_metadata,
-    write_ground_truth_metadata,
+    write_metadata_with_resource_usage,
     write_press_records,
 )
 from palpation_sim.features import extract_feature_map
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
 from palpation_sim.phantom import LumpSpec, create_structured_tet_mesh, material_arrays_for_lumps
-from palpation_sim.workflow import DEFAULT_NEWTON_ROOT, REQUIRED_NEWTON_DEVICE, require_runtime_environment
+from palpation_sim.workflow import (
+    DEFAULT_NEWTON_ROOT,
+    REQUIRED_NEWTON_DEVICE,
+    ResourceMonitor,
+    run_output_metadata,
+    with_run_date_prefix,
+    require_runtime_environment,
+)
 
 
 MM = 1.0e-3
@@ -73,6 +80,7 @@ def main() -> None:
     parser.add_argument("--edge-margin-mm", type=float, default=4.0)
     args = parser.parse_args()
     require_runtime_environment(require_newton=True, newton_root=args.newton_root)
+    args.out_dir = with_run_date_prefix(args.out_dir)
     if args.smoke:
         _apply_smoke_overrides(args)
 
@@ -81,6 +89,7 @@ def main() -> None:
     lumps = _fixed_lumps()
     _validate_lumps(lumps)
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    print(f"output dir: {args.out_dir}", flush=True)
 
     run_summaries: list[dict[str, object]] = []
     run_summaries.append(_run_newton(args, material, lumps))
@@ -90,6 +99,7 @@ def main() -> None:
         {
             "schema_version": 1,
             "description": "Fixed four-cylinder Newton/VBD phantom palpation proof of concept.",
+            "run": run_output_metadata(args.out_dir),
             "elapsed_seconds": time.time() - start,
             "units": "meters",
             "phantom_size_m": list(PHANTOM_SIZE_M),
@@ -143,6 +153,7 @@ def _run_newton(
         newton_root=args.newton_root,
         device=args.newton_device,
     )
+    monitor = ResourceMonitor(device=args.newton_device).start()
     sample = simulator.run_sample(lumps)
     return _write_run_outputs(
         run_dir=run_dir,
@@ -157,6 +168,7 @@ def _run_newton(
         tet_lump_mask=tet_lump_mask,
         tet_lump_id=tet_lump_id,
         args=args,
+        monitor=monitor,
     )
 
 
@@ -174,8 +186,8 @@ def _write_run_outputs(
     tet_lump_mask: np.ndarray,
     tet_lump_id: np.ndarray,
     args: argparse.Namespace,
+    monitor: ResourceMonitor,
 ) -> dict[str, object]:
-    run_start = time.time()
     run_dir.mkdir(parents=True, exist_ok=True)
     npz_path = run_dir / "fixed_four_cylinder_sample.npz"
     metadata_path = run_dir / "metadata.json"
@@ -208,6 +220,7 @@ def _write_run_outputs(
 
     curve_summary_path = run_dir / "curve_summary.csv"
     _write_curve_summary(curve_summary_path, sample)
+    resource_usage = monitor.finish(storage_root=run_dir)
     metadata = build_ground_truth_metadata(
         sample_id=sample_id,
         split=backend_label,
@@ -234,12 +247,13 @@ def _write_run_outputs(
         "requested_press_steps": int(args.press_steps),
     }
     metadata["mesh"] = _mesh_summary(phantom, mesh, tet_lump_mask, tet_lump_id, len(lumps))
-    write_ground_truth_metadata(metadata_path, metadata)
+    write_metadata_with_resource_usage(metadata_path, metadata, resource_usage, storage_root=run_dir)
 
     return {
         "run": run_dir.name,
         "backend": backend_label,
-        "elapsed_seconds": time.time() - run_start,
+        "elapsed_seconds": float(resource_usage["elapsed_seconds"]),
+        "resource_usage": resource_usage,
         "npz": str(npz_path),
         "metadata": str(metadata_path),
         "phantom_mesh": str(gltf_path) if gltf_path is not None else None,
