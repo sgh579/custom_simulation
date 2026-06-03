@@ -22,12 +22,11 @@ from palpation_sim.exports import (
 from palpation_sim.features import extract_feature_map
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
 from palpation_sim.phantom import mask_for_scan_grid, sample_lumps
-from palpation_sim.strain_stiffening import run_strain_stiffening_sample
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate synthetic palpation process data.")
-    parser.add_argument("--backend", choices=["newton", "analytic", "strain_stiffening"], default="newton")
+    parser.add_argument("--backend", choices=["newton", "analytic"], default="newton")
     parser.add_argument("--out-dir", type=Path, default=Path("data/palpation"))
     parser.add_argument("--num-train", type=int, default=8)
     parser.add_argument("--num-val", type=int, default=2)
@@ -59,23 +58,6 @@ def main() -> None:
     parser.add_argument("--max-indentation", type=float, default=0.018)
     parser.add_argument("--substeps-per-depth", type=int, default=3)
     parser.add_argument("--vbd-iterations", type=int, default=5)
-    parser.add_argument(
-        "--strain-hardening-b",
-        type=float,
-        default=1.8,
-        help="Fung-like hardening strength for --backend strain_stiffening.",
-    )
-    parser.add_argument(
-        "--strain-noise-std",
-        type=float,
-        default=0.0,
-        help="Relative force noise for --backend strain_stiffening before convex enforcement.",
-    )
-    parser.add_argument(
-        "--no-enforce-convex",
-        action="store_true",
-        help="Do not post-process strain-stiffening curves into monotone convex loading curves.",
-    )
 
     parser.add_argument("--cells-x", type=int, default=32)
     parser.add_argument("--cells-y", type=int, default=32)
@@ -208,17 +190,6 @@ def main() -> None:
             if args.backend == "newton":
                 assert simulator is not None
                 sample = simulator.run_sample(lumps)
-            elif args.backend == "strain_stiffening":
-                sample = run_strain_stiffening_sample(
-                    phantom,
-                    material,
-                    scan,
-                    lumps,
-                    rng,
-                    hardening_b=args.strain_hardening_b,
-                    noise_std=args.strain_noise_std,
-                    enforce_convex=not args.no_enforce_convex,
-                )
             else:
                 sample = run_analytic_sample(phantom, material, scan, lumps, rng)
 
