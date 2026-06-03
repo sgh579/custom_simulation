@@ -73,3 +73,6 @@ tools/.phantom_viewer_server_*.log
 # OS files
 .DS_Store
 Thumbs.db
+
+# untracted files. Kept because it contains useful infomation (mostly from ai), but useless to the repo directly.
+untracted/
