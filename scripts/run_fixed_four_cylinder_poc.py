@@ -32,7 +32,6 @@ from palpation_sim.exports import (
 from palpation_sim.features import extract_feature_map
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
 from palpation_sim.phantom import LumpSpec, create_structured_tet_mesh, material_arrays_for_lumps
-from palpation_sim.strain_stiffening import run_strain_stiffening_sample
 
 
 MM = 1.0e-3
@@ -51,18 +50,10 @@ FIXED_LUMP_CENTERS_M = (
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the fixed four-cylinder palpation POC.")
     parser.add_argument("--out-dir", type=Path, default=Path("runs/fixed_four_cylinder_poc"))
-    parser.add_argument("--seed", type=int, default=28)
-    parser.add_argument("--skip-strain-stiffening", action="store_true")
-    parser.add_argument("--skip-newton", action="store_true")
     parser.add_argument("--allow-newton-missing", action="store_true")
     parser.add_argument("--smoke", action="store_true", help="Use tiny meshes/grids for a quick script check.")
     parser.add_argument("--no-press-records", action="store_true")
     parser.add_argument("--no-visualization", action="store_true")
-
-    parser.add_argument("--strain-cells-xy", type=int, default=128)
-    parser.add_argument("--strain-cells-z", type=int, default=40)
-    parser.add_argument("--strain-grid", type=int, default=20)
-    parser.add_argument("--strain-hardening-b", type=float, default=1.8)
 
     parser.add_argument("--newton-cells-xy", type=int, default=32)
     parser.add_argument("--newton-cells-z", type=int, default=10)
@@ -70,7 +61,11 @@ def main() -> None:
     parser.add_argument("--newton-substeps", type=int, default=3)
     parser.add_argument("--newton-vbd-iterations", type=int, default=5)
     parser.add_argument("--newton-root", type=Path, default=Path("/home/guoheng/newton"))
-    parser.add_argument("--newton-device", type=str, default="cuda:0")
+    parser.add_argument("--newton-device", type=str, default="auto")
+    parser.add_argument("--newton-k-mu", type=float, default=MaterialConfig.k_mu)
+    parser.add_argument("--newton-k-lambda", type=float, default=MaterialConfig.k_lambda)
+    parser.add_argument("--newton-soft-contact-ke", type=float, default=MaterialConfig.soft_contact_ke)
+    parser.add_argument("--newton-soft-contact-margin-mm", type=float, default=1.0)
 
     parser.add_argument("--press-steps", type=int, default=64)
     parser.add_argument("--max-indentation-mm", type=float, default=16.0)
@@ -81,34 +76,30 @@ def main() -> None:
         _apply_smoke_overrides(args)
 
     start = time.time()
-    rng = np.random.default_rng(args.seed)
     material = MaterialConfig()
     lumps = _fixed_lumps()
     _validate_lumps(lumps)
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     run_summaries: list[dict[str, object]] = []
-    if not args.skip_strain_stiffening:
-        run_summaries.append(_run_strain_stiffening(args, material, lumps, rng))
-    if not args.skip_newton:
-        try:
-            run_summaries.append(_run_newton(args, material, lumps))
-        except Exception as exc:
-            if not args.allow_newton_missing:
-                raise
-            failure = {
-                "run": "newton_poc",
-                "status": "skipped",
-                "reason": f"{type(exc).__name__}: {exc}",
-            }
-            run_summaries.append(failure)
-            _write_json(args.out_dir / "newton_poc_skipped.json", failure)
+    try:
+        run_summaries.append(_run_newton(args, material, lumps))
+    except Exception as exc:
+        if not args.allow_newton_missing:
+            raise
+        failure = {
+            "run": "newton_poc",
+            "status": "skipped",
+            "reason": f"{type(exc).__name__}: {exc}",
+        }
+        run_summaries.append(failure)
+        _write_json(args.out_dir / "newton_poc_skipped.json", failure)
 
     _write_json(
         args.out_dir / "summary.json",
         {
             "schema_version": 1,
-            "description": "Fixed four-cylinder phantom palpation proof of concept.",
+            "description": "Fixed four-cylinder Newton/VBD phantom palpation proof of concept.",
             "elapsed_seconds": time.time() - start,
             "units": "meters",
             "phantom_size_m": list(PHANTOM_SIZE_M),
@@ -124,61 +115,10 @@ def main() -> None:
 
 def _apply_smoke_overrides(args: argparse.Namespace) -> None:
     args.out_dir = args.out_dir / "smoke"
-    args.strain_cells_xy = min(args.strain_cells_xy, 8)
-    args.strain_cells_z = min(args.strain_cells_z, 3)
-    args.strain_grid = min(args.strain_grid, 3)
     args.newton_cells_xy = min(args.newton_cells_xy, 8)
     args.newton_cells_z = min(args.newton_cells_z, 5)
     args.newton_grid = min(args.newton_grid, 2)
     args.press_steps = min(args.press_steps, 5)
-
-
-def _run_strain_stiffening(
-    args: argparse.Namespace,
-    material: MaterialConfig,
-    lumps: Sequence[LumpSpec],
-    rng: np.random.Generator,
-) -> dict[str, object]:
-    run_dir = args.out_dir / "strain_stiffening"
-    phantom = _phantom(args.strain_cells_xy, args.strain_cells_xy, args.strain_cells_z)
-    scan = _scan(
-        grid_h=args.strain_grid,
-        grid_w=args.strain_grid,
-        press_steps=args.press_steps,
-        max_indentation_mm=args.max_indentation_mm,
-        probe_diameter_mm=args.probe_diameter_mm,
-        edge_margin_mm=args.edge_margin_mm,
-    )
-    print("building strain-stiffening high mesh...", flush=True)
-    mesh = create_structured_tet_mesh(phantom)
-    _, _, _, tet_lump_mask, tet_lump_id = material_arrays_for_lumps(mesh, material, lumps)
-    _require_nonempty_lump_tets(tet_lump_id, len(lumps), "strain_stiffening")
-
-    print("generating strain-stiffening response...", flush=True)
-    sample = run_strain_stiffening_sample(
-        phantom,
-        material,
-        scan,
-        lumps,
-        rng,
-        hardening_b=args.strain_hardening_b,
-        noise_std=0.0,
-        enforce_convex=True,
-    )
-    return _write_run_outputs(
-        run_dir=run_dir,
-        sample_id="fixed_four_cylinder_strain_stiffening",
-        backend_label="strain_stiffening",
-        sample=sample,
-        phantom=phantom,
-        material=material,
-        scan=scan,
-        lumps=lumps,
-        mesh=mesh,
-        tet_lump_mask=tet_lump_mask,
-        tet_lump_id=tet_lump_id,
-        args=args,
-    )
 
 
 def _run_newton(
@@ -187,6 +127,7 @@ def _run_newton(
     lumps: Sequence[LumpSpec],
 ) -> dict[str, object]:
     run_dir = args.out_dir / "newton_poc"
+    newton_material = _newton_material(args, material)
     phantom = _phantom(args.newton_cells_xy, args.newton_cells_xy, args.newton_cells_z)
     scan = _scan(
         grid_h=args.newton_grid,
@@ -195,18 +136,19 @@ def _run_newton(
         max_indentation_mm=args.max_indentation_mm,
         probe_diameter_mm=args.probe_diameter_mm,
         edge_margin_mm=args.edge_margin_mm,
+        soft_contact_margin_mm=args.newton_soft_contact_margin_mm,
         substeps=args.newton_substeps,
         vbd_iterations=args.newton_vbd_iterations,
     )
     print("building Newton POC mesh...", flush=True)
     mesh = create_structured_tet_mesh(phantom)
-    _, _, _, tet_lump_mask, tet_lump_id = material_arrays_for_lumps(mesh, material, lumps)
+    _, _, _, tet_lump_mask, tet_lump_id = material_arrays_for_lumps(mesh, newton_material, lumps)
     _require_nonempty_lump_tets(tet_lump_id, len(lumps), "newton_poc")
 
     print("generating Newton/VBD neo-Hookean-like response...", flush=True)
     simulator = NewtonVBDPalpationSimulator(
         phantom,
-        material,
+        newton_material,
         scan,
         newton_root=args.newton_root,
         device=args.newton_device,
@@ -218,7 +160,7 @@ def _run_newton(
         backend_label="newton_vbd",
         sample=sample,
         phantom=phantom,
-        material=material,
+        material=newton_material,
         scan=scan,
         lumps=lumps,
         mesh=mesh,
@@ -377,6 +319,7 @@ def _scan(
     max_indentation_mm: float,
     probe_diameter_mm: float,
     edge_margin_mm: float,
+    soft_contact_margin_mm: float | None = None,
     substeps: int = 3,
     vbd_iterations: int = 5,
 ) -> ScanConfig:
@@ -389,6 +332,25 @@ def _scan(
         press_steps=int(press_steps),
         sim_substeps_per_depth=int(substeps),
         vbd_iterations=int(vbd_iterations),
+        soft_contact_margin=(
+            ScanConfig.soft_contact_margin
+            if soft_contact_margin_mm is None
+            else float(soft_contact_margin_mm) * MM
+        ),
+    )
+
+
+def _newton_material(args: argparse.Namespace, base: MaterialConfig) -> MaterialConfig:
+    return MaterialConfig(
+        k_mu=float(args.newton_k_mu),
+        k_lambda=float(args.newton_k_lambda),
+        k_damp=base.k_damp,
+        soft_contact_ke=float(args.newton_soft_contact_ke),
+        soft_contact_kd=base.soft_contact_kd,
+        soft_contact_mu=base.soft_contact_mu,
+        probe_contact_mu=base.probe_contact_mu,
+        lump_stiffness_min=base.lump_stiffness_min,
+        lump_stiffness_max=base.lump_stiffness_max,
     )
 
 

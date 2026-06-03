@@ -38,7 +38,7 @@ class NewtonVBDPalpationSimulator:
         self.material = material
         self.scan = scan
         self.newton, self.wp, self.SolverVBD = _import_newton(newton_root)
-        self.device = device
+        self.device = _resolve_device(self.wp, device)
 
     def run_sample(self, lumps: LumpSpec | Sequence[LumpSpec]) -> dict[str, np.ndarray | str]:
         lump_list = normalize_lumps(lumps)
@@ -83,32 +83,39 @@ class NewtonVBDPalpationSimulator:
                     _reset_state(wp, state_0, state_1, initial_particle_q, initial_body_q)
 
                 previous_z = self.phantom.height + scan.probe_radius + scan.preload_gap
+                substeps = max(int(scan.sim_substeps_per_depth), 1)
                 for step, depth in enumerate(depths):
-                    z = self.phantom.height + scan.probe_radius + scan.preload_gap - float(depth)
-                    vz = (z - previous_z) / max(scan.sim_dt, 1e-9)
+                    target_z = self.phantom.height + scan.probe_radius + scan.preload_gap - float(depth)
 
-                    for _ in range(scan.sim_substeps_per_depth):
+                    for substep in range(substeps):
+                        alpha_0 = float(substep) / float(substeps)
+                        alpha_1 = float(substep + 1) / float(substeps)
+                        z_0 = previous_z + (target_z - previous_z) * alpha_0
+                        z_1 = previous_z + (target_z - previous_z) * alpha_1
+                        vz = (z_1 - z_0) / max(scan.sim_dt, 1e-9)
                         state_0.clear_forces()
                         state_1.clear_forces()
-                        _set_probe_kinematic_pose(wp, model, state_0, probe_body, float(x), float(y), z, vz)
-                        _set_probe_kinematic_pose(wp, model, state_1, probe_body, float(x), float(y), z, vz)
+                        _copy_particle_state(state_0, state_1)
+                        _set_probe_kinematic_pose(wp, model, state_0, probe_body, float(x), float(y), z_0, vz)
+                        _set_probe_kinematic_pose(wp, model, state_1, probe_body, float(x), float(y), z_1, vz)
                         if hasattr(solver, "rebuild_bvh"):
                             solver.rebuild_bvh(state_0)
-                        collision_pipeline.collide(state_0, contacts)
+                        collision_pipeline.collide(state_1, contacts)
                         solver.step(state_0, state_1, control, contacts, scan.sim_dt)
                         state_0, state_1 = state_1, state_0
 
-                    _set_probe_kinematic_pose(wp, model, state_0, probe_body, float(x), float(y), z, 0.0)
+                    _set_probe_kinematic_pose(wp, model, state_0, probe_body, float(x), float(y), target_z, 0.0)
                     collision_pipeline.collide(state_0, contacts)
                     force_z, patch = _estimate_probe_reaction_z(model, state_0, contacts, solver, probe_shape, self.material)
 
                     presses[row, col, step, 0] = depth
                     presses[row, col, step, 1] = force_z
                     fz[row, col, step] = force_z
-                    probe_pose[row, col, step] = np.asarray([x, y, z, 0.0, 0.0, 0.0, 1.0], dtype=np.float32)
+                    probe_pose[row, col, step] = np.asarray([x, y, target_z, 0.0, 0.0, 0.0, 1.0], dtype=np.float32)
                     contact_features[row, col, step] = patch
-                    previous_z = z
+                    previous_z = target_z
 
+        nonlinearity_ratio = _nonlinearity_ratio_map(indentation, fz)
         xy_grid = np.stack(np.meshgrid(xs, ys), axis=-1).astype(np.float32)
         first_lump_json = json.dumps(lump_list[0].to_dict(self.phantom)) if lump_list else "{}"
         return {
@@ -119,6 +126,7 @@ class NewtonVBDPalpationSimulator:
             "indentation_depth": indentation,
             "fz": fz,
             "contact_features": contact_features,
+            "nonlinearity_ratio": nonlinearity_ratio,
             "tet_lump_mask": tet_lump_mask,
             "tet_lump_id": tet_lump_id,
             "lump_json": first_lump_json,
@@ -205,6 +213,22 @@ def _import_newton(newton_root: str | Path | None) -> tuple[Any, Any, Any]:
     return newton, wp, SolverVBD
 
 
+def _resolve_device(wp: Any, device: str | None) -> str | None:
+    if device is None or str(device).strip() == "":
+        return device
+    requested = str(device).strip()
+    if requested.lower() != "auto":
+        return requested
+    try:
+        devices = [str(candidate) for candidate in wp.get_devices()]
+    except Exception:
+        return "cpu"
+    for candidate in devices:
+        if candidate.startswith("cuda"):
+            return candidate
+    return "cpu"
+
+
 def _fix_bottom_particles(wp: Any, model: Any, bottom_mask: np.ndarray) -> None:
     mass = model.particle_mass.numpy()
     inv_mass = model.particle_inv_mass.numpy()
@@ -223,6 +247,11 @@ def _reset_state(wp: Any, state_0: Any, state_1: Any, initial_particle_q: Any, i
     state_1.body_q.assign(initial_body_q)
     state_0.body_qd.zero_()
     state_1.body_qd.zero_()
+
+
+def _copy_particle_state(state_in: Any, state_out: Any) -> None:
+    state_out.particle_q.assign(state_in.particle_q)
+    state_out.particle_qd.assign(state_in.particle_qd)
 
 
 def _set_probe_kinematic_pose(
@@ -306,3 +335,33 @@ def _quat_rotate(quat: np.ndarray, vectors: np.ndarray) -> np.ndarray:
     uv = np.cross(q_xyz, vectors)
     uuv = np.cross(q_xyz, uv)
     return vectors + 2.0 * (q_w * uv + uuv)
+
+
+def _nonlinearity_ratio_map(depth: np.ndarray, fz: np.ndarray) -> np.ndarray:
+    ratios = np.zeros(fz.shape[:2], dtype=np.float32)
+    for row in range(fz.shape[0]):
+        for col in range(fz.shape[1]):
+            z = depth[row, col].astype(np.float64)
+            f = fz[row, col].astype(np.float64)
+            early = _segment_slope(z, f, 0.10, 0.35)
+            late = _segment_slope(z, f, 0.65, 0.90)
+            ratios[row, col] = np.float32(late / early) if early > 1.0e-12 else np.float32(0.0)
+    return ratios
+
+
+def _segment_slope(z: np.ndarray, f: np.ndarray, lo: float, hi: float) -> float:
+    if z.size < 2:
+        return 0.0
+    span = float(np.max(z) - np.min(z))
+    if span <= 1.0e-12:
+        return 0.0
+    keep = (z >= float(np.min(z)) + lo * span) & (z <= float(np.min(z)) + hi * span)
+    if int(np.count_nonzero(keep)) < 2:
+        return 0.0
+    zz = z[keep].astype(np.float64)
+    ff = f[keep].astype(np.float64)
+    zc = zz - float(np.mean(zz))
+    denom = float(np.sum(zc * zc))
+    if denom <= 1.0e-18:
+        return 0.0
+    return float(np.sum(zc * (ff - float(np.mean(ff)))) / denom)
