@@ -35,6 +35,15 @@ from palpation_sim.workflow import (
 
 MM = 1.0e-3
 DEFAULT_SIZE_M = (80.0 * MM, 80.0 * MM, 25.0 * MM)
+DEFAULT_OUT_DIR = Path("runs/center_sphere_newton_vbd_h05_mesh96_g20_t120_s12_i24")
+DEFAULT_CELLS_X = 96
+DEFAULT_CELLS_Y = 96
+DEFAULT_CELLS_Z = 32
+DEFAULT_GRID_H = 20
+DEFAULT_GRID_W = 20
+DEFAULT_PRESS_STEPS = 120
+DEFAULT_SUBSTEPS = 12
+DEFAULT_VBD_ITERATIONS = 24
 
 
 class ChunkScanConfig(ScanConfig):
@@ -54,7 +63,7 @@ class ChunkScanConfig(ScanConfig):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate a centered-sphere Newton/VBD palpation sample.")
-    parser.add_argument("--out-dir", type=Path, default=Path("runs/center_sphere_newton_vbd_48x48x32_scan20x20"))
+    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--newton-root", type=Path, default=DEFAULT_NEWTON_ROOT, help="Pinned Newton source root.")
     parser.add_argument("--device", type=str, default=REQUIRED_NEWTON_DEVICE, help="Pinned Warp/Newton CUDA device.")
     parser.add_argument("--row-chunk-size", type=int, default=1)
@@ -63,20 +72,21 @@ def main() -> None:
     parser.add_argument("--assemble-only", action="store_true")
     parser.add_argument("--no-assemble", action="store_true")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--init-only", action="store_true", help="Write run configuration and exit without simulating.")
     parser.add_argument("--no-features", action="store_true")
 
-    parser.add_argument("--cells-x", type=int, default=48)
-    parser.add_argument("--cells-y", type=int, default=48)
-    parser.add_argument("--cells-z", type=int, default=32)
-    parser.add_argument("--grid-h", type=int, default=20)
-    parser.add_argument("--grid-w", type=int, default=20)
+    parser.add_argument("--cells-x", type=int, default=DEFAULT_CELLS_X)
+    parser.add_argument("--cells-y", type=int, default=DEFAULT_CELLS_Y)
+    parser.add_argument("--cells-z", type=int, default=DEFAULT_CELLS_Z)
+    parser.add_argument("--grid-h", type=int, default=DEFAULT_GRID_H)
+    parser.add_argument("--grid-w", type=int, default=DEFAULT_GRID_W)
     parser.add_argument("--edge-margin-mm", type=float, default=4.0)
     parser.add_argument("--probe-diameter-mm", type=float, default=8.0)
     parser.add_argument("--max-indentation-mm", type=float, default=8.0)
-    parser.add_argument("--press-steps", type=int, default=64)
+    parser.add_argument("--press-steps", type=int, default=DEFAULT_PRESS_STEPS)
     parser.add_argument("--soft-contact-margin-mm", type=float, default=1.0)
-    parser.add_argument("--substeps", type=int, default=3)
-    parser.add_argument("--vbd-iterations", type=int, default=5)
+    parser.add_argument("--substeps", type=int, default=DEFAULT_SUBSTEPS)
+    parser.add_argument("--vbd-iterations", type=int, default=DEFAULT_VBD_ITERATIONS)
     parser.add_argument("--k-mu", type=float, default=2.0e5)
     parser.add_argument("--k-lambda", type=float, default=2.0e5)
     parser.add_argument("--soft-contact-ke", type=float, default=2.0e6)
@@ -95,7 +105,13 @@ def main() -> None:
     print(f"output dir: {args.out_dir}", flush=True)
     chunk_dir = args.out_dir / "chunks"
     chunk_dir.mkdir(parents=True, exist_ok=True)
-    _write_run_config(args.out_dir / "run_config.json", args, phantom, material, scan, [lump])
+    run_config_path = args.out_dir / "run_config.json"
+    if not (args.resume and run_config_path.exists()):
+        _write_run_config(run_config_path, args, phantom, material, scan, [lump])
+
+    if args.init_only:
+        print(f"initialized {args.out_dir}", flush=True)
+        return
 
     monitor = ResourceMonitor(device=args.device).start() if not args.no_assemble else None
     if not args.assemble_only:
@@ -317,10 +333,13 @@ def _write_run_config(
     scan: ScanConfig,
     lumps: Sequence[LumpSpec],
 ) -> None:
+    args_data = vars(args).copy()
+    if args_data.get("init_only"):
+        args_data["init_only"] = False
     data = {
         "schema_version": 1,
         "description": "Centered 100x sphere Newton/VBD run, chunked by scan rows.",
-        "args": vars(args),
+        "args": args_data,
         "phantom": phantom.to_dict(),
         "material": material.to_dict(),
         "scan": scan.to_dict(),
