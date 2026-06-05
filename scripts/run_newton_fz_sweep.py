@@ -19,7 +19,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from palpation_sim.config import MaterialConfig, PhantomConfig, ScanConfig
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
 from palpation_sim.phantom import LumpSpec
-from palpation_sim.exports import write_metadata_with_resource_usage
+from palpation_sim.exports import write_metadata_with_resource_usage, write_visualization_command
 from palpation_sim.workflow import (
     DEFAULT_NEWTON_ROOT,
     REQUIRED_NEWTON_DEVICE,
@@ -128,6 +128,7 @@ def main() -> None:
             "summary_csv": "summary.csv",
             "plot": "fz_curves.png",
             "sample_npz_pattern": "{target}/{case_label}.npz",
+            "sample_visualization_command_pattern": "{target}/{case_label}_visualization_command.md",
         },
         "cases": summaries,
     }
@@ -178,12 +179,14 @@ def _run_case(
     metrics = _curve_metrics(depth, force)
 
     sample_path: Path | None = None
+    visualization_command_path: Path | None = None
     if not args.no_save_samples:
         sample_dir = args.out_dir / target_name
         sample_dir.mkdir(parents=True, exist_ok=True)
         sample_path = sample_dir / f"{case.label}.npz"
         np.savez_compressed(sample_path, **sample)
-    storage_root = sample_path if sample_path is not None else args.out_dir
+        visualization_command_path = write_visualization_command(sample_path, project_root=PROJECT_ROOT)
+    storage_root = (sample_path, visualization_command_path) if sample_path is not None else args.out_dir
     resource_usage = monitor.finish(storage_root=storage_root)
 
     return {
@@ -193,6 +196,7 @@ def _run_case(
         "elapsed_seconds": float(resource_usage["elapsed_seconds"]),
         "resource_usage": resource_usage,
         "sample": str(sample_path) if sample_path is not None else None,
+        "visualization_command": str(visualization_command_path) if visualization_command_path is not None else None,
         "cells": [int(phantom.cells_x), int(phantom.cells_y), int(phantom.cells_z)],
         "particle_radius_mm": float(phantom.particle_radius * 1000.0),
         "probe_diameter_mm": float(case.probe_diameter_mm),
@@ -300,6 +304,7 @@ def _write_summary(path: Path, rows: Sequence[dict[str, object]]) -> None:
         "label",
         "elapsed_seconds",
         "sample",
+        "visualization_command",
         "cells",
         "particle_radius_mm",
         "point_mm",

@@ -14,6 +14,7 @@ from typing import Sequence
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 RUN_ROOT = PROJECT_ROOT / "runs" / "perf_curve_center_sphere"
 CENTER_SCRIPT = PROJECT_ROOT / "scripts" / "run_center_sphere_newton.py"
 H03_SECONDS = 3306.4033203125
@@ -37,6 +38,10 @@ class Target:
     cells_x: int = 96
     cells_y: int = 96
     cells_z: int = 32
+    inclusion_shape: str = "sphere"
+    inclusion_center_mm: tuple[float, float, float] | None = None
+    inclusion_radii_mm: tuple[float, float, float] | None = None
+    inclusion_yaw_deg: float = 0.0
 
     @property
     def work_units(self) -> int:
@@ -51,6 +56,59 @@ TARGETS: tuple[Target, ...] = (
     Target("h04_2h_mesh96_g17_t112_s10_i20", 2.0, 17, 112, 10, 20),
     Target("h05_4h_mesh96_g19_t120_s12_i24", 4.0, 19, 120, 12, 24),
     Target("h05_4h_mesh96_g20_t120_s12_i24", 4.0, 20, 120, 12, 24),
+    Target(
+        "h05_sphere_shallow_mesh96_g20_t120_s12_i24",
+        4.0,
+        20,
+        120,
+        12,
+        24,
+        inclusion_center_mm=(0.0, 0.0, 14.0),
+        inclusion_radii_mm=(10.0, 10.0, 10.0),
+    ),
+    Target(
+        "h05_sphere_deep_mesh96_g20_t120_s12_i24",
+        4.0,
+        20,
+        120,
+        12,
+        24,
+        inclusion_center_mm=(0.0, 0.0, 11.0),
+        inclusion_radii_mm=(10.0, 10.0, 10.0),
+    ),
+    Target(
+        "h05_cylinder_left_mesh96_g20_t120_s12_i24",
+        4.0,
+        20,
+        120,
+        12,
+        24,
+        inclusion_shape="cylinder",
+        inclusion_center_mm=(-12.0, 0.0, 20.0),
+        inclusion_radii_mm=(7.0, 7.0, 2.5),
+    ),
+    Target(
+        "h05_cylinder_center_mesh96_g20_t120_s12_i24",
+        4.0,
+        20,
+        120,
+        12,
+        24,
+        inclusion_shape="cylinder",
+        inclusion_center_mm=(0.0, 0.0, 20.0),
+        inclusion_radii_mm=(7.0, 7.0, 2.5),
+    ),
+    Target(
+        "h05_cylinder_right_mesh96_g20_t120_s12_i24",
+        4.0,
+        20,
+        120,
+        12,
+        24,
+        inclusion_shape="cylinder",
+        inclusion_center_mm=(12.0, 0.0, 20.0),
+        inclusion_radii_mm=(7.0, 7.0, 2.5),
+    ),
     Target("h06_6h_mesh96_g19_t128_s14_i28", 6.0, 19, 128, 14, 28),
     Target("h07_8h_mesh96_g21_t144_s14_i28", 8.0, 21, 144, 14, 28),
     Target("h08_11h_mesh96_g23_t152_s14_i30", 11.0, 23, 152, 14, 30),
@@ -81,6 +139,7 @@ def main() -> None:
     parser.add_argument("--launch-stagger-seconds", type=float, default=0.5)
     parser.add_argument("--plan-only", action="store_true", help="Print the planned targets without launching jobs.")
     parser.add_argument("--keep-going", action="store_true", help="Continue to later targets if one target fails.")
+    parser.add_argument("--no-draw-curves", action="store_true", help="Skip default per-run and run-root F-z curve PNGs.")
     args = parser.parse_args()
 
     targets = _select_targets(args.labels)
@@ -116,6 +175,7 @@ def main() -> None:
                 requested_jobs,
                 ram_budget,
                 max(float(args.launch_stagger_seconds), 0.0),
+                not args.no_draw_curves,
             )
         except RuntimeError as exc:
             failure = {"label": target.label, "error": str(exc)}
@@ -123,6 +183,9 @@ def main() -> None:
             print(json.dumps({"target_failed": failure}, ensure_ascii=True), flush=True)
             if not args.keep_going:
                 raise
+
+    if not args.no_draw_curves:
+        _draw_run_root(args.run_root)
 
     if failures:
         raise SystemExit(f"{len(failures)} target(s) failed; see logs above")
@@ -145,6 +208,7 @@ def _run_target(
     requested_jobs: int,
     ram_budget: dict[str, object],
     launch_stagger_seconds: float,
+    draw_curves: bool,
 ) -> None:
     started = time.perf_counter()
     out_dir = run_root / f"{_timestamp()}-{target.label}"
@@ -229,24 +293,29 @@ def _run_target(
 
     print(f"[{target.label}] assembling", flush=True)
     assemble_cmd = _base_cmd(target, out_dir) + ["--resume", "--assemble-only", "--no-features"]
+    if not draw_curves:
+        assemble_cmd.append("--no-draw-curves")
     _run_logged(assemble_cmd, logs_dir / "assemble.log")
 
     manifest["status"] = "complete"
     manifest["finished_at_local"] = datetime.now().isoformat(timespec="seconds")
     manifest["parallel_elapsed_seconds"] = float(time.perf_counter() - started)
-    manifest["outputs"] = {
+    outputs = {
         "npz": str(out_dir / "center_sphere_newton_sample.npz"),
         "metadata": str(out_dir / "metadata.json"),
         "summary": str(out_dir / "summary.json"),
         "curve_summary": str(out_dir / "curve_summary.csv"),
     }
+    if draw_curves:
+        outputs["fz_curves"] = str(out_dir / "fz_curves.png")
+    manifest["outputs"] = outputs
     _copy_summary_metrics(out_dir, manifest)
     _write_json(out_dir / "parallel_run_summary.json", manifest)
     print(f"[{target.label}] complete in {manifest['parallel_elapsed_seconds']:.1f}s", flush=True)
 
 
 def _base_cmd(target: Target, out_dir: Path) -> list[str]:
-    return _python_cmd() + [
+    cmd = _python_cmd() + [
         str(CENTER_SCRIPT),
         "--out-dir",
         str(out_dir),
@@ -266,7 +335,27 @@ def _base_cmd(target: Target, out_dir: Path) -> list[str]:
         str(target.substeps),
         "--vbd-iterations",
         str(target.vbd_iterations),
+        "--inclusion-shape",
+        target.inclusion_shape,
+        "--inclusion-yaw-deg",
+        str(target.inclusion_yaw_deg),
     ]
+    if target.inclusion_center_mm is not None:
+        x_mm, y_mm, z_mm = target.inclusion_center_mm
+        cmd.extend(
+            [
+                "--inclusion-center-x-mm",
+                str(x_mm),
+                "--inclusion-center-y-mm",
+                str(y_mm),
+                "--inclusion-center-z-mm",
+                str(z_mm),
+            ]
+        )
+    if target.inclusion_radii_mm is not None:
+        rx_mm, ry_mm, rz_mm = target.inclusion_radii_mm
+        cmd.extend(["--inclusion-radii-mm", str(rx_mm), str(ry_mm), str(rz_mm)])
+    return cmd
 
 
 def _python_cmd() -> list[str]:
@@ -459,6 +548,17 @@ def _copy_summary_metrics(out_dir: Path, manifest: dict[str, object]) -> None:
         "total_chunk_elapsed_seconds",
     ]
     manifest["assembled_summary_metrics"] = {key: summary.get(key) for key in keys}
+
+
+def _draw_run_root(run_root: Path) -> None:
+    from palpation_sim.curve_plots import draw_run_group_curves
+
+    try:
+        result = draw_run_group_curves(run_root)
+    except FileNotFoundError as exc:
+        print(json.dumps({"curve_plot_skipped": str(exc)}, ensure_ascii=True), flush=True)
+        return
+    print(json.dumps({"curve_plot": result["plot"], "skipped_child_dirs": result["skipped_child_dirs"]}, ensure_ascii=True), flush=True)
 
 
 def _write_json(path: Path, data: dict[str, object]) -> None:

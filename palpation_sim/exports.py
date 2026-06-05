@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import csv
 import json
+import shlex
 from pathlib import Path
 from typing import Sequence
 
@@ -124,6 +125,7 @@ def build_dataset_metadata(
             "metadata": "metadata.json",
             "sample_npz_pattern": "{split}/sample_{index:04d}.npz",
             "sample_metadata_pattern": "{split}/sample_{index:04d}_gt.json",
+            "sample_visualization_command_pattern": "{split}/sample_{index:04d}_visualization_command.md",
             "sample_phantom_3d_pattern": "{split}/sample_{index:04d}_phantom.gltf",
             "sample_press_records_pattern": "{split}/sample_{index:04d}_press_records/",
         },
@@ -140,6 +142,7 @@ def build_dataset_metadata(
                 "count": int(count),
                 "sample_npz_pattern": f"{split}/sample_{{index:04d}}.npz",
                 "sample_metadata_pattern": f"{split}/sample_{{index:04d}}_gt.json",
+                "sample_visualization_command_pattern": f"{split}/sample_{{index:04d}}_visualization_command.md",
                 "sample_phantom_3d_pattern": f"{split}/sample_{{index:04d}}_phantom.gltf",
                 "sample_press_records_pattern": f"{split}/sample_{{index:04d}}_press_records/",
             }
@@ -147,6 +150,38 @@ def build_dataset_metadata(
         },
         "args": json_ready(args),
     }
+
+
+def visualization_command_path(npz_path: Path) -> Path:
+    return npz_path.with_name(f"{npz_path.stem}_visualization_command.md")
+
+
+def write_visualization_command(npz_path: Path, *, project_root: Path | None = None) -> Path:
+    """Write the default native player command next to a generated simulation NPZ."""
+    path = visualization_command_path(npz_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    npz_arg = _command_path(npz_path, project_root=project_root)
+    path.write_text(
+        "python scripts/play_press_native.py \\\n"
+        f"  {shlex.quote(npz_arg)} \\\n"
+        "  --mesh-style discrete \\\n"
+        "  --tet-stride 64 \\\n"
+        "  --vertex-stride 16\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _command_path(path: Path, *, project_root: Path | None) -> str:
+    path = Path(path)
+    if not path.is_absolute():
+        return path.as_posix()
+    if project_root is not None:
+        try:
+            return path.relative_to(project_root).as_posix()
+        except ValueError:
+            pass
+    return path.as_posix()
 
 
 def write_press_records(

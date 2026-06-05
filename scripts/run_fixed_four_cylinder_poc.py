@@ -28,6 +28,7 @@ from palpation_sim.exports import (
     build_ground_truth_metadata,
     write_metadata_with_resource_usage,
     write_press_records,
+    write_visualization_command,
 )
 from palpation_sim.features import extract_feature_map
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
@@ -207,6 +208,7 @@ def _write_run_outputs(
 
     print(f"writing {npz_path}...", flush=True)
     np.savez_compressed(npz_path, **sample)
+    visualization_command_path = write_visualization_command(npz_path, project_root=PROJECT_ROOT)
 
     if gltf_path is not None:
         print(f"writing {gltf_path}...", flush=True)
@@ -235,6 +237,7 @@ def _write_run_outputs(
         press_records_dir=press_dir,
         scan_animation_path=animation_path,
     )
+    metadata["files"]["visualization_command"] = visualization_command_path.name
     metadata["poc"] = {
         "name": "fixed_four_cylinder",
         "units": "meters",
@@ -260,6 +263,7 @@ def _write_run_outputs(
         "scan_animation": str(animation_path) if animation_path is not None else None,
         "press_records": str(press_dir) if press_dir is not None else None,
         "curve_summary": str(curve_summary_path),
+        "visualization_command": str(visualization_command_path),
         "mesh": _mesh_summary(phantom, mesh, tet_lump_mask, tet_lump_id, len(lumps)),
         "presses_shape": list(np.asarray(sample["presses"]).shape),
         "fz_shape": list(np.asarray(sample["fz"]).shape),

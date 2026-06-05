@@ -20,6 +20,7 @@ from palpation_sim.exports import (
     write_phantom_gltf,
     write_press_records,
     write_scan_animation_html,
+    write_visualization_command,
 )
 from palpation_sim.features import extract_feature_map
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
@@ -209,6 +210,7 @@ def main() -> None:
                         z_gap=args.z_gap,
                     )
             if args.resume and out_path.exists():
+                write_visualization_command(out_path, project_root=PROJECT_ROOT)
                 print(f"[{split}] skip existing {out_path}")
                 continue
             monitor = ResourceMonitor(device=args.device if args.backend == "newton" else None).start()
@@ -245,6 +247,8 @@ def main() -> None:
                 scan_animation_path=scan_animation_path,
             )
             np.savez_compressed(out_path, **sample)
+            visualization_command_path = write_visualization_command(out_path, project_root=PROJECT_ROOT)
+            metadata["files"]["visualization_command"] = visualization_command_path.name
             if gltf_path is not None:
                 write_phantom_gltf(gltf_path, phantom, lumps, material)
             if scan_animation_path is not None:
@@ -257,13 +261,13 @@ def main() -> None:
                     split=split,
                 )
             resource_usage = monitor.finish(
-                storage_root=(out_path, gt_path, gltf_path, press_records_dir, scan_animation_path)
+                storage_root=(out_path, gt_path, gltf_path, press_records_dir, scan_animation_path, visualization_command_path)
             )
             write_metadata_with_resource_usage(
                 gt_path,
                 metadata,
                 resource_usage,
-                storage_root=(out_path, gt_path, gltf_path, press_records_dir, scan_animation_path),
+                storage_root=(out_path, gt_path, gltf_path, press_records_dir, scan_animation_path, visualization_command_path),
             )
             print(f"[{split}] wrote {out_path}")
 

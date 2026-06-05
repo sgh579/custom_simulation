@@ -54,6 +54,8 @@ Single-run phantom scripts write a run directory with:
 metadata.json                    stable sample metadata, following docs/metadata_template.json
 *.npz                            numeric arrays
 curve_summary.csv                optional F-z summary table
+fz_curves.png                    optional representative F-z curve plot
+*_visualization_command.md       native player command for generated sample NPZs
 press_records/                   optional per-press CSV/plot records
 phantom_mesh.gltf                optional mesh preview
 scan_animation.html              optional browser animation
@@ -64,8 +66,10 @@ Dataset generation writes:
 ```text
 metadata.json                    dataset-level manifest
 train/sample_XXXX.npz            numeric arrays
+train/sample_XXXX_visualization_command.md
 train/sample_XXXX_gt.json        sample-level metadata with the same schema as metadata.json
 val/sample_XXXX.npz
+val/sample_XXXX_visualization_command.md
 val/sample_XXXX_gt.json
 ```
 
@@ -115,6 +119,7 @@ resource_usage.elapsed_seconds     elapsed wall-clock seconds for the sample/cas
 resource_usage.gpu_memory          nvidia-smi memory.used observations in bytes
 resource_usage.disk_usage          final saved file sizes in bytes and allocated bytes
 files.npz                         primary numeric sample file
+files.visualization_command       native player command for the sample NPZ
 files.phantom_3d                  glTF preview if generated
 files.press_records               press-record directory if generated
 phantom/material/scan             full configuration used by the run

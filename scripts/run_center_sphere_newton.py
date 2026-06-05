@@ -11,11 +11,14 @@ from typing import Sequence
 
 import numpy as np
 
+os.environ.setdefault("MPLBACKEND", "Agg")
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from palpation_sim.config import MaterialConfig, PhantomConfig, ScanConfig
-from palpation_sim.exports import build_ground_truth_metadata, write_metadata_with_resource_usage
+from palpation_sim.curve_plots import draw_sample_curves
+from palpation_sim.exports import build_ground_truth_metadata, write_metadata_with_resource_usage, write_visualization_command
 from palpation_sim.features import extract_feature_map
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
 from palpation_sim.phantom import (
@@ -74,6 +77,7 @@ def main() -> None:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--init-only", action="store_true", help="Write run configuration and exit without simulating.")
     parser.add_argument("--no-features", action="store_true")
+    parser.add_argument("--no-draw-curves", action="store_true", help="Skip the default F-z curve PNG.")
 
     parser.add_argument("--cells-x", type=int, default=DEFAULT_CELLS_X)
     parser.add_argument("--cells-y", type=int, default=DEFAULT_CELLS_Y)
@@ -91,6 +95,12 @@ def main() -> None:
     parser.add_argument("--k-lambda", type=float, default=2.0e5)
     parser.add_argument("--soft-contact-ke", type=float, default=2.0e6)
     parser.add_argument("--sphere-radius-mm", type=float, default=10.0)
+    parser.add_argument("--inclusion-shape", choices=["sphere", "ellipsoid", "box", "cylinder", "capsule"], default="sphere")
+    parser.add_argument("--inclusion-center-x-mm", type=float, default=0.0)
+    parser.add_argument("--inclusion-center-y-mm", type=float, default=0.0)
+    parser.add_argument("--inclusion-center-z-mm", type=float, default=None)
+    parser.add_argument("--inclusion-radii-mm", type=float, nargs=3, default=None)
+    parser.add_argument("--inclusion-yaw-deg", type=float, default=0.0)
     parser.add_argument("--stiffness-multiplier", type=float, default=100.0)
     args = parser.parse_args()
     require_runtime_environment(require_newton=True, newton_root=args.newton_root)
@@ -99,7 +109,7 @@ def main() -> None:
     phantom = _phantom(args)
     material = _material(args)
     scan = _scan(args)
-    lump = _center_sphere(phantom, args)
+    lump = _inclusion(phantom, args)
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     print(f"output dir: {args.out_dir}", flush=True)
@@ -240,7 +250,11 @@ def _assemble(
 
     npz_path = args.out_dir / "center_sphere_newton_sample.npz"
     metadata_path = args.out_dir / "metadata.json"
+    curve_plot_path = None if args.no_draw_curves else args.out_dir / "fz_curves.png"
     np.savez_compressed(npz_path, **sample)
+    visualization_command_path = write_visualization_command(npz_path, project_root=PROJECT_ROOT)
+    if curve_plot_path is not None:
+        draw_sample_curves(sample, curve_plot_path, title=args.out_dir.name)
     metadata = build_ground_truth_metadata(
         sample_id="center_sphere_newton_vbd",
         split="single",
@@ -252,6 +266,8 @@ def _assemble(
         npz_path=npz_path,
         metadata_path=metadata_path,
     )
+    metadata["files"]["curve_plot"] = curve_plot_path.name if curve_plot_path is not None else None
+    metadata["files"]["visualization_command"] = visualization_command_path.name
     metadata["center_sphere_run"] = {
         "requested_backend": "newton_vbd",
         "requested_mesh": [int(args.cells_x), int(args.cells_y), int(args.cells_z)],
@@ -260,14 +276,31 @@ def _assemble(
         "requested_max_indentation_mm": float(args.max_indentation_mm),
         "requested_press_steps": int(args.press_steps),
         "requested_soft_contact_margin_mm": float(args.soft_contact_margin_mm),
-        "requested_inclusion": "center sphere",
-        "sphere_radius_mm_assumption": float(args.sphere_radius_mm),
+        "requested_inclusion": str(args.inclusion_shape),
+        "requested_inclusion_center_mm": [
+            float(args.inclusion_center_x_mm),
+            float(args.inclusion_center_y_mm),
+            float(args.inclusion_center_z_mm) if args.inclusion_center_z_mm is not None else 0.5 * float(phantom.height) / MM,
+        ],
+        "requested_inclusion_radii_mm": [
+            float(v) for v in (args.inclusion_radii_mm if args.inclusion_radii_mm is not None else [args.sphere_radius_mm] * 3)
+        ],
+        "requested_inclusion_yaw_deg": float(args.inclusion_yaw_deg),
         "stiffness_multiplier": float(args.stiffness_multiplier),
         "chunk_elapsed_seconds": chunk_elapsed,
     }
     _write_curve_summary(args.out_dir / "curve_summary.csv", sample)
     resource_usage = monitor.finish(storage_root=args.out_dir)
-    _write_summary(args.out_dir / "summary.json", sample, npz_path, metadata_path, chunk_elapsed, resource_usage)
+    _write_summary(
+        args.out_dir / "summary.json",
+        sample,
+        npz_path,
+        metadata_path,
+        curve_plot_path,
+        visualization_command_path,
+        chunk_elapsed,
+        resource_usage,
+    )
     write_metadata_with_resource_usage(metadata_path, metadata, resource_usage, storage_root=args.out_dir)
     print(f"assembled {npz_path}", flush=True)
 
@@ -308,16 +341,31 @@ def _scan(args: argparse.Namespace) -> ScanConfig:
     )
 
 
-def _center_sphere(phantom: PhantomConfig, args: argparse.Namespace) -> LumpSpec:
-    radius = float(args.sphere_radius_mm) * MM
-    center = (0.0, 0.0, 0.5 * float(phantom.height))
-    if center[2] - radius < 0.0 or center[2] + radius > phantom.height:
-        raise ValueError("Center sphere radius does not fit inside the phantom height.")
+def _inclusion(phantom: PhantomConfig, args: argparse.Namespace) -> LumpSpec:
+    if args.inclusion_radii_mm is None:
+        radius = float(args.sphere_radius_mm) * MM
+        radii = (radius, radius, radius)
+    else:
+        rx, ry, rz = (float(v) * MM for v in args.inclusion_radii_mm)
+        radii = (rx, ry, rz)
+    center_z = 0.5 * float(phantom.height) if args.inclusion_center_z_mm is None else float(args.inclusion_center_z_mm) * MM
+    center = (
+        float(args.inclusion_center_x_mm) * MM,
+        float(args.inclusion_center_y_mm) * MM,
+        center_z,
+    )
+    z_extent = radii[0] + radii[2] if args.inclusion_shape == "capsule" else radii[2]
+    xy_extent = max(radii[0], radii[1])
+    if center[2] - z_extent < 0.0 or center[2] + z_extent > phantom.height:
+        raise ValueError("Inclusion z extent does not fit inside the phantom height.")
+    if abs(center[0]) + xy_extent > 0.5 * phantom.size_x or abs(center[1]) + xy_extent > 0.5 * phantom.size_y:
+        raise ValueError("Inclusion xy extent does not fit inside the phantom width.")
     return LumpSpec(
-        shape="sphere",
+        shape=args.inclusion_shape,
         center=center,
-        radii=(radius, radius, radius),
+        radii=radii,
         stiffness_multiplier=float(args.stiffness_multiplier),
+        yaw=np.deg2rad(float(args.inclusion_yaw_deg)),
     )
 
 
@@ -338,7 +386,7 @@ def _write_run_config(
         args_data["init_only"] = False
     data = {
         "schema_version": 1,
-        "description": "Centered 100x sphere Newton/VBD run, chunked by scan rows.",
+        "description": "Single-inclusion Newton/VBD run, chunked by scan rows.",
         "args": args_data,
         "phantom": phantom.to_dict(),
         "material": material.to_dict(),
@@ -396,6 +444,8 @@ def _write_summary(
     sample: dict[str, object],
     npz_path: Path,
     metadata_path: Path,
+    curve_plot_path: Path | None,
+    visualization_command_path: Path,
     chunk_elapsed: Sequence[float],
     resource_usage: dict[str, object],
 ) -> None:
@@ -408,6 +458,8 @@ def _write_summary(
         "schema_version": 1,
         "npz": str(npz_path),
         "metadata": str(metadata_path),
+        "curve_plot": str(curve_plot_path) if curve_plot_path is not None else None,
+        "visualization_command": str(visualization_command_path),
         "curve_shape": list(fz.shape),
         "peak_force_median_n": float(np.nanmedian(np.nanmax(fz, axis=-1))),
         "peak_force_max_n": float(np.nanmax(fz)),

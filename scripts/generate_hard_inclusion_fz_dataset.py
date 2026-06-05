@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from palpation_sim.config import MaterialConfig, PhantomConfig, ScanConfig
-from palpation_sim.exports import build_ground_truth_metadata, write_metadata_with_resource_usage
+from palpation_sim.exports import build_ground_truth_metadata, write_metadata_with_resource_usage, write_visualization_command
 from palpation_sim.features import extract_feature_map
 from palpation_sim.newton_vbd import NewtonVBDPalpationSimulator
 from palpation_sim.phantom import LumpSpec, create_structured_tet_mesh, material_arrays_for_lumps
@@ -182,6 +182,7 @@ def _run_case(
     npz_path = case_dir / "sample.npz"
     metadata_path = case_dir / "metadata.json"
     np.savez_compressed(npz_path, **sample)
+    visualization_command_path = write_visualization_command(npz_path, project_root=PROJECT_ROOT)
 
     rows = _curve_rows(case, sample, elapsed=monitor.elapsed_seconds())
     _write_csv(case_dir / "curve_summary.csv", rows)
@@ -201,6 +202,7 @@ def _run_case(
         npz_path=npz_path,
         metadata_path=metadata_path,
     )
+    metadata["files"]["visualization_command"] = visualization_command_path.name
     metadata["case"] = _case_metadata(case)
     metadata["mesh"] = {
         "vertices": int(mesh.vertices.shape[0]),
@@ -344,6 +346,7 @@ def _write_dataset_metadata(
             "case_metadata_pattern": "{case}/metadata.json",
             "case_curve_summary_pattern": "{case}/curve_summary.csv",
             "case_curve_plot_pattern": "{case}/fz_curves.png",
+            "case_visualization_command_pattern": "{case}/sample_visualization_command.md",
         },
         "scan_mode": str(args.scan_mode),
         "scan_step_mm": float(args.scan_step_mm) if args.scan_mode == "plane" else None,
