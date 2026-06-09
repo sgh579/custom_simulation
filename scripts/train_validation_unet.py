@@ -88,6 +88,11 @@ def main() -> None:
     parser.add_argument("--data-dir", type=Path, required=True, help="Directory with training .npz files.")
     parser.add_argument("--val-dir", type=Path, default=None, help="Optional directory with validation .npz files.")
     parser.add_argument("--out-dir", type=Path, default=Path("runs/validation_unet"))
+    parser.add_argument(
+        "--exact-out-dir",
+        action="store_true",
+        help="Use --out-dir exactly instead of adding a date prefix under runs/.",
+    )
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument(
         "--max-minutes",
@@ -128,7 +133,7 @@ def main() -> None:
     parser.add_argument("--device", type=str, default="cuda", help="Required CUDA device, e.g. cuda or cuda:0.")
     args = parser.parse_args()
     require_runtime_environment()
-    args.out_dir = with_run_date_prefix(args.out_dir)
+    args.out_dir = with_run_date_prefix(args.out_dir, enabled=not args.exact_out_dir)
 
     _load_ml_dependencies()
 

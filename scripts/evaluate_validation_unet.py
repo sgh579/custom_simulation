@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -17,16 +18,26 @@ def main() -> None:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, default=Path("runs/validation_unet_eval"))
+    parser.add_argument(
+        "--exact-out-dir",
+        action="store_true",
+        help="Use --out-dir exactly instead of adding a date prefix under runs/.",
+    )
     parser.add_argument("--threshold", type=float, default=0.5)
     parser.add_argument("--sweep-thresholds", action="store_true", help="Also evaluate a threshold sweep.")
     parser.add_argument("--sweep-min", type=float, default=0.1)
     parser.add_argument("--sweep-max", type=float, default=0.9)
     parser.add_argument("--sweep-step", type=float, default=0.05)
     parser.add_argument("--max-images", type=int, default=12)
+    parser.add_argument(
+        "--no-analytic-phantom-3d",
+        action="store_true",
+        help="Do not write per-sample analytic 3D phantom/lump geometry PNGs.",
+    )
     parser.add_argument("--device", type=str, default="cuda", help="Required CUDA device, e.g. cuda or cuda:0.")
     args = parser.parse_args()
     require_runtime_environment()
-    args.out_dir = with_run_date_prefix(args.out_dir)
+    args.out_dir = with_run_date_prefix(args.out_dir, enabled=not args.exact_out_dir)
 
     _load_dependencies()
 
@@ -70,6 +81,8 @@ def main() -> None:
             np.save(args.out_dir / f"{stem}_pred.npy", pred)
             np.save(args.out_dir / f"{stem}_baseline_stiffness.npy", baseline_stiffness.astype(np.float32))
             _save_stiffness_figure(args.out_dir / f"{stem}_baseline_stiffness.png", baseline_stiffness, path.name)
+            if not args.no_analytic_phantom_3d:
+                _save_analytic_phantom_figure(args.out_dir / f"{stem}_analytic_phantom_3d.png", path)
             _save_sample_figure(
                 args.out_dir / f"{stem}_comparison.png",
                 prob,
@@ -89,6 +102,10 @@ def main() -> None:
     summary["input_mode"] = input_mode
     summary["input_description"] = str(checkpoint.get("input_description", input_mode))
     summary["baseline_stiffness"] = "Equivalent stiffness map k=(F_peak-F_start)/(disp_peak-disp_start) is saved for visualized samples."
+    summary["analytic_phantom_3d"] = (
+        "Per-sample analytic phantom/lump distribution PNGs are saved for visualized samples unless "
+        "--no-analytic-phantom-3d is passed."
+    )
     summary["gt_note"] = "Metrics and visualizations use the scan-grid mask, which is the target used for training loss."
 
     with (args.out_dir / "metrics_summary.json").open("w") as f:
@@ -300,6 +317,205 @@ def _save_stiffness_figure(path: Path, stiffness, title: str) -> None:
     fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
     fig.savefig(path, dpi=180)
     plt.close(fig)
+
+
+def _save_analytic_phantom_figure(path: Path, sample_path: Path) -> None:
+    phantom, lumps = _load_analytic_geometry(sample_path)
+    sx = float(phantom.get("size_x", 0.18))
+    sy = float(phantom.get("size_y", 0.18))
+    height = float(phantom.get("height", 0.08))
+    fig = plt.figure(figsize=(6.6, 5.2), constrained_layout=True)
+    ax = fig.add_subplot(111, projection="3d")
+    _draw_phantom_box(ax, sx, sy, height)
+    colors = ["#d94f3d", "#1687d9", "#eba21a", "#3fa662", "#9367c7", "#d56a9f"]
+    for idx, lump in enumerate(lumps):
+        color = colors[idx % len(colors)]
+        _draw_lump_surface(ax, lump, color=color)
+        center = tuple(float(v) for v in lump["center"])
+        ax.text(
+            center[0],
+            center[1],
+            center[2],
+            f"{idx} {lump.get('shape', '')}\n{float(lump.get('stiffness_multiplier', 0.0)):.0f}x",
+            color="#111111",
+            fontsize=8,
+            ha="center",
+            va="center",
+        )
+
+    ax.set_title(f"{sample_path.stem}: analytic phantom/lump geometry", fontsize=11)
+    ax.set_xlabel("x [m]")
+    ax.set_ylabel("y [m]")
+    ax.set_zlabel("z [m]")
+    ax.view_init(elev=24, azim=-46)
+    _set_equal_3d(ax, (-0.5 * sx, 0.5 * sx), (-0.5 * sy, 0.5 * sy), (0.0, height))
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
+
+
+def _load_analytic_geometry(sample_path: Path) -> tuple[dict[str, object], list[dict[str, object]]]:
+    with np.load(sample_path) as sample:
+        phantom = json.loads(_sample_string(sample["phantom_json"])) if "phantom_json" in sample else {}
+        lumps = json.loads(_sample_string(sample["lumps_json"])) if "lumps_json" in sample else []
+    return phantom, list(lumps)
+
+
+def _sample_string(value) -> str:
+    item = np.asarray(value).reshape(()).item()
+    if isinstance(item, bytes):
+        return item.decode("utf-8")
+    return str(item)
+
+
+def _draw_phantom_box(ax, sx: float, sy: float, height: float) -> None:
+    x0, x1 = -0.5 * sx, 0.5 * sx
+    y0, y1 = -0.5 * sy, 0.5 * sy
+    z0, z1 = 0.0, height
+    corners = {
+        "000": (x0, y0, z0),
+        "100": (x1, y0, z0),
+        "110": (x1, y1, z0),
+        "010": (x0, y1, z0),
+        "001": (x0, y0, z1),
+        "101": (x1, y0, z1),
+        "111": (x1, y1, z1),
+        "011": (x0, y1, z1),
+    }
+    edges = [
+        ("000", "100"),
+        ("100", "110"),
+        ("110", "010"),
+        ("010", "000"),
+        ("001", "101"),
+        ("101", "111"),
+        ("111", "011"),
+        ("011", "001"),
+        ("000", "001"),
+        ("100", "101"),
+        ("110", "111"),
+        ("010", "011"),
+    ]
+    for a, b in edges:
+        xs, ys, zs = zip(corners[a], corners[b])
+        ax.plot(xs, ys, zs, color="#6d8796", linewidth=1.0, alpha=0.82)
+    xx, yy = np.meshgrid([x0, x1], [y0, y1])
+    zz = np.full_like(xx, z1, dtype=float)
+    ax.plot_surface(xx, yy, zz, color="#8fc7e8", alpha=0.08, linewidth=0.0, shade=False)
+
+
+def _draw_lump_surface(ax, lump: dict[str, object], *, color: str) -> None:
+    shape = str(lump.get("shape", ""))
+    center = np.asarray(lump.get("center", (0.0, 0.0, 0.0)), dtype=float)
+    radii = np.maximum(np.asarray(lump.get("radii", (0.01, 0.01, 0.01)), dtype=float), 1.0e-9)
+    yaw = float(lump.get("yaw", 0.0))
+    if shape in {"sphere", "ellipsoid"}:
+        x, y, z = _ellipsoid_surface(center, radii, yaw)
+        _surface(ax, x, y, z, color)
+    elif shape == "cylinder":
+        for x, y, z in _cylinder_surfaces(center, radii, yaw):
+            _surface(ax, x, y, z, color)
+    elif shape == "box":
+        _draw_box_lump(ax, center, radii, yaw, color)
+    elif shape == "capsule":
+        for x, y, z in _capsule_surfaces(center, radii, yaw):
+            _surface(ax, x, y, z, color)
+    else:
+        x, y, z = _ellipsoid_surface(center, radii, yaw)
+        _surface(ax, x, y, z, color)
+
+
+def _ellipsoid_surface(center: np.ndarray, radii: np.ndarray, yaw: float, *, n_u: int = 36, n_v: int = 18):
+    u = np.linspace(0.0, 2.0 * math.pi, n_u)
+    v = np.linspace(0.0, math.pi, n_v)
+    uu, vv = np.meshgrid(u, v)
+    local = np.stack(
+        [
+            radii[0] * np.cos(uu) * np.sin(vv),
+            radii[1] * np.sin(uu) * np.sin(vv),
+            radii[2] * np.cos(vv),
+        ],
+        axis=-1,
+    )
+    world = _rotate_translate(local, center, yaw)
+    return world[..., 0], world[..., 1], world[..., 2]
+
+
+def _cylinder_surfaces(center: np.ndarray, radii: np.ndarray, yaw: float):
+    theta = np.linspace(0.0, 2.0 * math.pi, 40)
+    zz = np.linspace(-radii[2], radii[2], 12)
+    tt, z_grid = np.meshgrid(theta, zz)
+    side = np.stack([radii[0] * np.cos(tt), radii[1] * np.sin(tt), z_grid], axis=-1)
+    top_r = np.linspace(0.0, 1.0, 10)
+    tt_cap, rr = np.meshgrid(theta, top_r)
+    top = np.stack([radii[0] * rr * np.cos(tt_cap), radii[1] * rr * np.sin(tt_cap), np.full_like(rr, radii[2])], axis=-1)
+    bottom = np.stack([top[..., 0], top[..., 1], np.full_like(rr, -radii[2])], axis=-1)
+    return [_surface_xyz(surface, center, yaw) for surface in (side, top, bottom)]
+
+
+def _capsule_surfaces(center: np.ndarray, radii: np.ndarray, yaw: float):
+    radius = float(radii[0])
+    half_axis = float(radii[2])
+    theta = np.linspace(0.0, 2.0 * math.pi, 36)
+    z_body = np.linspace(-half_axis, half_axis, 10)
+    tt, zz = np.meshgrid(theta, z_body)
+    body = np.stack([radius * np.cos(tt), radius * np.sin(tt), zz], axis=-1)
+    u = np.linspace(0.0, 2.0 * math.pi, 36)
+    phi_top = np.linspace(0.0, 0.5 * math.pi, 12)
+    uu, pp = np.meshgrid(u, phi_top)
+    top = np.stack(
+        [radius * np.cos(uu) * np.cos(pp), radius * np.sin(uu) * np.cos(pp), half_axis + radius * np.sin(pp)],
+        axis=-1,
+    )
+    bottom = np.stack([top[..., 0], top[..., 1], -top[..., 2]], axis=-1)
+    return [_surface_xyz(surface, center, yaw) for surface in (body, top, bottom)]
+
+
+def _draw_box_lump(ax, center: np.ndarray, radii: np.ndarray, yaw: float, color: str) -> None:
+    xs = [-radii[0], radii[0]]
+    ys = [-radii[1], radii[1]]
+    zs = [-radii[2], radii[2]]
+    faces = [
+        np.asarray([[[xs[0], y, z] for y in ys] for z in zs], dtype=float),
+        np.asarray([[[xs[1], y, z] for y in ys] for z in zs], dtype=float),
+        np.asarray([[[x, ys[0], z] for x in xs] for z in zs], dtype=float),
+        np.asarray([[[x, ys[1], z] for x in xs] for z in zs], dtype=float),
+        np.asarray([[[x, y, zs[0]] for x in xs] for y in ys], dtype=float),
+        np.asarray([[[x, y, zs[1]] for x in xs] for y in ys], dtype=float),
+    ]
+    for face in faces:
+        x, y, z = _surface_xyz(face, center, yaw)
+        _surface(ax, x, y, z, color)
+
+
+def _surface_xyz(local: np.ndarray, center: np.ndarray, yaw: float):
+    world = _rotate_translate(local, center, yaw)
+    return world[..., 0], world[..., 1], world[..., 2]
+
+
+def _rotate_translate(local: np.ndarray, center: np.ndarray, yaw: float) -> np.ndarray:
+    c = math.cos(yaw)
+    s = math.sin(yaw)
+    world = np.array(local, copy=True, dtype=float)
+    x = local[..., 0]
+    y = local[..., 1]
+    world[..., 0] = c * x - s * y + center[0]
+    world[..., 1] = s * x + c * y + center[1]
+    world[..., 2] = local[..., 2] + center[2]
+    return world
+
+
+def _surface(ax, x, y, z, color: str) -> None:
+    ax.plot_surface(x, y, z, color=color, alpha=0.66, linewidth=0.2, edgecolor="#1f1f1f", shade=True)
+
+
+def _set_equal_3d(ax, xlim: tuple[float, float], ylim: tuple[float, float], zlim: tuple[float, float]) -> None:
+    ax.set_xlim(*xlim)
+    ax.set_ylim(*ylim)
+    ax.set_zlim(*zlim)
+    try:
+        ax.set_box_aspect((xlim[1] - xlim[0], ylim[1] - ylim[0], zlim[1] - zlim[0]))
+    except AttributeError:
+        pass
 
 
 def _save_contact_sheet(path: Path, visuals) -> None:

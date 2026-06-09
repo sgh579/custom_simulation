@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from palpation_sim.config import MaterialConfig, PhantomConfig, ScanConfig
 from palpation_sim.exports import (
     build_dataset_metadata,
     build_ground_truth_metadata,
+    visualization_command_path,
     write_ground_truth_metadata,
     write_metadata_with_resource_usage,
     write_phantom_gltf,
@@ -45,6 +47,18 @@ def main() -> None:
         "--resume",
         action="store_true",
         help="Skip samples whose .npz already exists while still advancing the sampler for deterministic continuation.",
+    )
+    parser.add_argument(
+        "--worker-count",
+        type=int,
+        default=1,
+        help="Number of deterministic sample-partition workers for parallel generation.",
+    )
+    parser.add_argument(
+        "--worker-index",
+        type=int,
+        default=0,
+        help="Zero-based worker index; this worker generates sample_idx %% worker_count.",
     )
     parser.add_argument("--save-features", action="store_true", help="Also store engineered feature maps.")
     parser.add_argument("--no-save-phantom-3d", action="store_true", help="Do not write per-phantom glTF 3D preview files.")
@@ -85,6 +99,12 @@ def main() -> None:
     )
     parser.add_argument("--lump-size-scale", type=float, default=1.0, help="Multiplier for sampled lump dimensions.")
     parser.add_argument(
+        "--lump-stiffness-multiplier",
+        type=float,
+        default=None,
+        help="When set, force every sampled lump to this stiffness multiplier.",
+    )
+    parser.add_argument(
         "--max-lump-radius-fraction",
         type=float,
         default=0.2,
@@ -114,6 +134,10 @@ def main() -> None:
     parser.add_argument("--device", type=str, default=REQUIRED_NEWTON_DEVICE, help="Pinned Warp/Newton CUDA device.")
     parser.add_argument("--allow-empty-mask", action="store_true", help="Allow sampled lumps that miss all scan cells.")
     args = parser.parse_args()
+    if args.worker_count < 1:
+        raise SystemExit("--worker-count must be >= 1.")
+    if args.worker_index < 0 or args.worker_index >= args.worker_count:
+        raise SystemExit("--worker-index must be in [0, --worker-count).")
     require_runtime_environment(require_newton=args.backend == "newton", newton_root=args.newton_root)
     args.out_dir = with_run_date_prefix(args.out_dir, enabled=not args.resume)
 
@@ -127,7 +151,7 @@ def main() -> None:
         cells_z=args.cells_z,
         particle_radius=args.particle_radius,
     )
-    material = MaterialConfig()
+    material = _material_from_args(args)
     scan = ScanConfig(
         grid_h=args.grid_h,
         grid_w=args.grid_w,
@@ -177,6 +201,12 @@ def main() -> None:
         split_dir.mkdir(parents=True, exist_ok=True)
         for sample_idx in range(count):
             out_path = split_dir / f"sample_{sample_idx:04d}.npz"
+            gt_path = split_dir / f"sample_{sample_idx:04d}_gt.json"
+            gltf_path = None if args.no_save_phantom_3d else split_dir / f"sample_{sample_idx:04d}_phantom.gltf"
+            press_records_dir = None if args.no_save_press_records else split_dir / f"sample_{sample_idx:04d}_press_records"
+            scan_animation_path = (
+                None if args.no_save_scan_animation else split_dir / f"sample_{sample_idx:04d}_scan_animation.html"
+            )
             lumps = sample_lumps(
                 rng,
                 phantom,
@@ -209,10 +239,23 @@ def main() -> None:
                         separate_z=not args.allow_z_overlap,
                         z_gap=args.z_gap,
                     )
-            if args.resume and out_path.exists():
+            if sample_idx % args.worker_count != args.worker_index:
+                continue
+            if args.resume and _sample_artifacts_complete(
+                out_path,
+                gt_path,
+                args.backend,
+                scan,
+                expected_multiplier=args.lump_stiffness_multiplier,
+                count_min=args.lumps_min,
+                count_max=args.lumps_max,
+            ):
                 write_visualization_command(out_path, project_root=PROJECT_ROOT)
                 print(f"[{split}] skip existing {out_path}")
                 continue
+            if args.resume and out_path.exists():
+                _remove_sample_artifacts(out_path, gt_path, gltf_path, press_records_dir, scan_animation_path)
+                print(f"[{split}] regenerating incomplete {out_path}")
             monitor = ResourceMonitor(device=args.device if args.backend == "newton" else None).start()
             if args.backend == "newton":
                 assert simulator is not None
@@ -226,12 +269,6 @@ def main() -> None:
             if args.save_features:
                 sample["features"] = extract_feature_map(sample["presses"])  # type: ignore[arg-type]
 
-            gltf_path = None if args.no_save_phantom_3d else split_dir / f"sample_{sample_idx:04d}_phantom.gltf"
-            gt_path = split_dir / f"sample_{sample_idx:04d}_gt.json"
-            press_records_dir = None if args.no_save_press_records else split_dir / f"sample_{sample_idx:04d}_press_records"
-            scan_animation_path = (
-                None if args.no_save_scan_animation else split_dir / f"sample_{sample_idx:04d}_scan_animation.html"
-            )
             metadata = build_ground_truth_metadata(
                 sample_id=f"sample_{sample_idx:04d}",
                 split=split,
@@ -246,7 +283,7 @@ def main() -> None:
                 press_records_dir=press_records_dir,
                 scan_animation_path=scan_animation_path,
             )
-            np.savez_compressed(out_path, **sample)
+            _write_npz_atomic(out_path, sample)
             visualization_command_path = write_visualization_command(out_path, project_root=PROJECT_ROOT)
             metadata["files"]["visualization_command"] = visualization_command_path.name
             if gltf_path is not None:
@@ -278,6 +315,117 @@ def main() -> None:
         dataset_resource_usage,
         storage_root=args.out_dir,
     )
+
+
+def _material_from_args(args: argparse.Namespace) -> MaterialConfig:
+    if args.lump_stiffness_multiplier is None:
+        return MaterialConfig()
+    multiplier = float(args.lump_stiffness_multiplier)
+    if not np.isfinite(multiplier) or multiplier <= 0.0:
+        raise SystemExit("--lump-stiffness-multiplier must be a positive finite value.")
+    return MaterialConfig(lump_stiffness_min=multiplier, lump_stiffness_max=multiplier)
+
+
+def _write_npz_atomic(out_path: Path, sample: dict[str, object]) -> None:
+    tmp_path = out_path.with_name(f".{out_path.name}.tmp.npz")
+    if tmp_path.exists():
+        tmp_path.unlink()
+    np.savez_compressed(tmp_path, **sample)
+    tmp_path.replace(out_path)
+
+
+def _sample_artifacts_complete(
+    out_path: Path,
+    gt_path: Path,
+    backend: str,
+    scan: ScanConfig,
+    *,
+    expected_multiplier: float | None,
+    count_min: int,
+    count_max: int,
+) -> bool:
+    if not out_path.exists() or not gt_path.exists():
+        return False
+    if not _valid_json_file(gt_path):
+        return False
+    try:
+        with np.load(out_path) as sample:
+            _require_npz_array(sample, "fz", (scan.grid_h, scan.grid_w, scan.press_steps))
+            _require_npz_array(sample, "presses", (scan.grid_h, scan.grid_w, scan.press_steps, 2))
+            _require_npz_array(sample, "mask", (scan.grid_h, scan.grid_w))
+            _require_npz_member(sample, "lumps_json")
+            _require_npz_member(sample, "num_lumps")
+            num_lumps = int(np.asarray(sample["num_lumps"]).reshape(()))
+            if num_lumps < int(count_min) or num_lumps > int(count_max):
+                raise ValueError(f"num_lumps {num_lumps} outside [{count_min}, {count_max}]")
+            lumps = json.loads(_npz_string(sample["lumps_json"]))
+            if len(lumps) != num_lumps:
+                raise ValueError(f"lumps_json length {len(lumps)} != num_lumps {num_lumps}")
+            if expected_multiplier is not None:
+                expected = float(expected_multiplier)
+                for lump in lumps:
+                    multiplier = float(lump.get("stiffness_multiplier", np.nan))
+                    if abs(multiplier - expected) > 1.0e-6:
+                        raise ValueError(f"stiffness_multiplier {multiplier} != {expected}")
+            if backend == "newton":
+                _require_npz_member(sample, "tet_lump_mask")
+                _require_npz_member(sample, "tet_lump_id")
+    except Exception:
+        return False
+    return True
+
+
+def _valid_json_file(path: Path) -> bool:
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            json.load(f)
+    except Exception:
+        return False
+    return True
+
+
+def _require_npz_array(sample: np.lib.npyio.NpzFile, key: str, shape: tuple[int, ...]) -> None:
+    _require_npz_member(sample, key)
+    value = np.asarray(sample[key])
+    if value.shape != shape:
+        raise ValueError(f"{key} shape {value.shape} != {shape}")
+    if not np.isfinite(value).all():
+        raise ValueError(f"{key} contains non-finite values")
+
+
+def _require_npz_member(sample: np.lib.npyio.NpzFile, key: str) -> None:
+    if key not in sample.files:
+        raise KeyError(key)
+
+
+def _npz_string(value: object) -> str:
+    item = np.asarray(value).reshape(()).item()
+    if isinstance(item, bytes):
+        return item.decode("utf-8")
+    return str(item)
+
+
+def _remove_sample_artifacts(
+    out_path: Path,
+    gt_path: Path,
+    gltf_path: Path | None,
+    press_records_dir: Path | None,
+    scan_animation_path: Path | None,
+) -> None:
+    candidates = [
+        out_path,
+        out_path.with_name(f".{out_path.name}.tmp.npz"),
+        gt_path,
+        gltf_path,
+        scan_animation_path,
+        visualization_command_path(out_path),
+    ]
+    for path in candidates:
+        if path is not None and path.exists() and path.is_file():
+            path.unlink()
+    if press_records_dir is not None and press_records_dir.exists():
+        shutil.rmtree(press_records_dir)
+
 
 def _parse_shapes(raw: str) -> tuple[str, ...]:
     allowed = {"sphere", "ellipsoid", "box", "cylinder", "capsule"}
