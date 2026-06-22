@@ -1,0 +1,27 @@
+{
+  "created_at": "2026-06-22T05:21:02.231859+00:00",
+  "entries": [
+    {
+      "kind": "file",
+      "path": "artifacts/transfer_packages/highres_128_randomsplit_1000_400_400_writing_bundle_20260618.tar.gz",
+      "sha256": "c0cf05d48e6ecb9972576dc7d61fd70a5a8b3229ef79d568eaab2efd92058baf",
+      "size_bytes": 1696012
+    },
+    {
+      "kind": "file",
+      "path": "artifacts/transfer_packages/palpation_random_press_depth_only_results_128_1000train_400val_400test_20260620.tar.gz",
+      "sha256": "5eea0009db640c4a22cc99d036b552e77a5351c689bb43dead12d94c9d13c40e",
+      "size_bytes": 742846269
+    }
+  ],
+  "git": {
+    "available": true,
+    "branch": "dev",
+    "commit": "a409d59226bee05aaf9719962ef7a03dfa549574",
+    "dirty": true
+  },
+  "host": "GoodmandeMacBook-Air.local",
+  "name": "local_transfer_packages_20260622",
+  "repo_root": "/Users/goodmansun/code_base/projects/custom_simulation",
+  "schema_version": 1
+}

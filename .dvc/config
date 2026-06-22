@@ -1,0 +1,4 @@
+[core]
+    remote = lab204-models
+['remote "lab204-models"']
+    url = ssh://lab204/home/guoheng/dvc-remotes/custom_simulation-models

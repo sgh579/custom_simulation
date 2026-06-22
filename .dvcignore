@@ -1,0 +1,9 @@
+# Keep DVC focused on curated model artifacts.
+.git/
+data/
+runs/
+outputs/
+artifacts/transfer_packages/
+untracted/
+__pycache__/
+*.pyc

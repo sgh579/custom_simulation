@@ -1,0 +1,112 @@
+{
+  "description": "Best raw-Fz plus mechanical feature U-Net from the 20x four-seed segmentation sweep.",
+  "git": {
+    "available": true,
+    "branch": "dev",
+    "commit": "a409d59226bee05aaf9719962ef7a03dfa549574",
+    "dirty": true
+  },
+  "metrics_summary": {
+    "config": {
+      "augment": true,
+      "augmentation": "d4",
+      "best_fixed_val_dice": 0.8042648196220398,
+      "checkpoint": "runs/segmentation_accuracy_sweep_20x_4seed/unet_fz_features_aug_focal/best.pt",
+      "epochs_completed": 50,
+      "epochs_requested": 50,
+      "feature_names": [
+        "f_max",
+        "equivalent_stiffness",
+        "global_stiffness",
+        "early_stiffness",
+        "late_stiffness",
+        "loading_work",
+        "force_z25",
+        "force_z50",
+        "force_z75",
+        "nonlinearity_ratio"
+      ],
+      "focal": true,
+      "input": "raw_fz_plus_features",
+      "loss": "focal_bce_dice",
+      "normalize_mode": "dataset",
+      "seed": 7,
+      "shape": [
+        20,
+        20
+      ],
+      "smoke": false,
+      "train_dir": "data/palpation_newton_random_shapes_20x_scan20_combined_seed11_seed23_seed37_seed53/train",
+      "train_samples": 800,
+      "val_dir": "data/palpation_newton_random_shapes_20x_scan20_combined_seed11_seed23_seed37_seed53/val",
+      "val_samples": 80
+    },
+    "fixed_threshold": {
+      "dice": 0.8025550035486161,
+      "fn": 249,
+      "fp": 1142,
+      "iou": 0.6702228544333807,
+      "pixel_accuracy": 0.95653125,
+      "precision": 0.7122700932224741,
+      "recall": 0.9190507152145644,
+      "threshold": 0.5,
+      "tn": 27782,
+      "tp": 2827
+    },
+    "group": "unet",
+    "method": "unet_fz_features_aug_focal",
+    "num_samples": 80,
+    "threshold_sweep_best": {
+      "dice": 0.8294293350102185,
+      "fn": 438,
+      "fp": 647,
+      "iou": 0.7085683588503895,
+      "pixel_accuracy": 0.96609375,
+      "precision": 0.8030441400304414,
+      "recall": 0.8576072821846554,
+      "threshold": 0.65,
+      "tn": 28277,
+      "tp": 2638
+    }
+  },
+  "model_file": "models/unet_fz_features_aug_focal_20x4seed/best.pt",
+  "name": "unet_fz_features_aug_focal_20x4seed",
+  "registered_at": "2026-06-22T05:33:35.099799+00:00",
+  "run_config": {
+    "augment": true,
+    "augmentation": "d4",
+    "best_fixed_val_dice": 0.8042648196220398,
+    "checkpoint": "runs/segmentation_accuracy_sweep_20x_4seed/unet_fz_features_aug_focal/best.pt",
+    "epochs_completed": 50,
+    "epochs_requested": 50,
+    "feature_names": [
+      "f_max",
+      "equivalent_stiffness",
+      "global_stiffness",
+      "early_stiffness",
+      "late_stiffness",
+      "loading_work",
+      "force_z25",
+      "force_z50",
+      "force_z75",
+      "nonlinearity_ratio"
+    ],
+    "focal": true,
+    "input": "raw_fz_plus_features",
+    "loss": "focal_bce_dice",
+    "normalize_mode": "dataset",
+    "seed": 7,
+    "shape": [
+      20,
+      20
+    ],
+    "smoke": false,
+    "train_dir": "data/palpation_newton_random_shapes_20x_scan20_combined_seed11_seed23_seed37_seed53/train",
+    "train_samples": 800,
+    "val_dir": "data/palpation_newton_random_shapes_20x_scan20_combined_seed11_seed23_seed37_seed53/val",
+    "val_samples": 80
+  },
+  "run_dir": "runs/segmentation_accuracy_sweep_20x_4seed/unet_fz_features_aug_focal",
+  "schema_version": 1,
+  "source_checkpoint": "runs/segmentation_accuracy_sweep_20x_4seed/unet_fz_features_aug_focal/best.pt"
+}

@@ -77,9 +77,11 @@ def main() -> None:
         if idx < args.max_images:
             stem = path.stem
             baseline_stiffness = _load_equivalent_stiffness_map(path, gt.shape)
+            baseline_kmeans = _kmeans_high_stiffness_mask(baseline_stiffness)
             np.save(args.out_dir / f"{stem}_prob.npy", prob.astype(np.float32))
             np.save(args.out_dir / f"{stem}_pred.npy", pred)
             np.save(args.out_dir / f"{stem}_baseline_stiffness.npy", baseline_stiffness.astype(np.float32))
+            np.save(args.out_dir / f"{stem}_baseline_kmeans_pred.npy", baseline_kmeans)
             _save_stiffness_figure(args.out_dir / f"{stem}_baseline_stiffness.png", baseline_stiffness, path.name)
             if not args.no_analytic_phantom_3d:
                 _save_analytic_phantom_figure(args.out_dir / f"{stem}_analytic_phantom_3d.png", path)
@@ -89,10 +91,11 @@ def main() -> None:
                 pred,
                 gt,
                 baseline_stiffness,
+                baseline_kmeans,
                 path.name,
                 metrics,
             )
-            visuals.append((path.name, prob, pred, gt, baseline_stiffness, metrics))
+            visuals.append((path.name, prob, pred, gt, baseline_stiffness, baseline_kmeans, metrics))
 
     summary = _metrics_from_counts(global_counts)
     summary["num_samples"] = len(dataset)
@@ -101,7 +104,10 @@ def main() -> None:
     summary["data_dir"] = str(args.data_dir)
     summary["input_mode"] = input_mode
     summary["input_description"] = str(checkpoint.get("input_description", input_mode))
-    summary["baseline_stiffness"] = "Equivalent stiffness map k=(F_peak-F_start)/(disp_peak-disp_start) is saved for visualized samples."
+    summary["baseline_stiffness"] = (
+        "Equivalent stiffness map k=(F_peak-F_start)/(disp_peak-disp_start) and its two-cluster "
+        "high-stiffness mask are saved for visualized samples."
+    )
     summary["analytic_phantom_3d"] = (
         "Per-sample analytic phantom/lump distribution PNGs are saved for visualized samples unless "
         "--no-analytic-phantom-3d is passed."
@@ -278,30 +284,68 @@ def _stiffness_limits(stiffness) -> tuple[float, float]:
     return lo, hi
 
 
+def _kmeans_high_stiffness_mask(stiffness) -> np.ndarray:
+    values = np.asarray(stiffness, dtype=np.float32)
+    finite_mask = np.isfinite(values)
+    finite_values = values[finite_mask]
+    result = np.zeros(values.shape, dtype=np.uint8)
+    if finite_values.size == 0:
+        return result
+
+    c0, c1 = np.percentile(finite_values, [25.0, 75.0]).astype(np.float32)
+    if abs(float(c1 - c0)) < 1e-6:
+        c0 = float(np.nanmin(finite_values))
+        c1 = float(np.nanmax(finite_values))
+    if abs(float(c1 - c0)) < 1e-6:
+        return result
+
+    labels = np.zeros(finite_values.shape, dtype=np.uint8)
+    for _ in range(30):
+        d0 = np.abs(finite_values - c0)
+        d1 = np.abs(finite_values - c1)
+        new_labels = (d1 < d0).astype(np.uint8)
+        if np.array_equal(new_labels, labels):
+            break
+        labels = new_labels
+        if np.any(labels == 0):
+            c0 = float(np.mean(finite_values[labels == 0]))
+        if np.any(labels == 1):
+            c1 = float(np.mean(finite_values[labels == 1]))
+
+    high_label = 1 if c1 >= c0 else 0
+    result[finite_mask] = (labels == high_label).astype(np.uint8)
+    return result
+
+
 def _save_sample_figure(
     path: Path,
     prob,
     pred,
     gt,
     baseline_stiffness,
+    baseline_kmeans,
     title: str,
     metrics: dict[str, float | int],
 ) -> None:
-    ncols = 4
+    ncols = 5
     fig, axes = plt.subplots(1, ncols, figsize=(2.8 * ncols, 3.0), constrained_layout=True)
     panels = [("GT", gt, "gray", 0.0, 1.0)]
     panels.extend([("Prob", prob, "viridis", 0.0, 1.0), ("Pred", pred, "gray", 0.0, 1.0)])
-    for ax, (name, data, cmap, vmin, vmax) in zip(axes, panels):
+    for ax, (name, data, cmap, vmin, vmax) in zip(axes[:3], panels):
         ax.imshow(data, cmap=cmap, vmin=vmin, vmax=vmax, interpolation="nearest")
         ax.set_title(name)
         ax.set_xticks([])
         ax.set_yticks([])
     k_vmin, k_vmax = _stiffness_limits(baseline_stiffness)
-    image = axes[-1].imshow(baseline_stiffness, cmap="magma", vmin=k_vmin, vmax=k_vmax, interpolation="nearest")
-    axes[-1].set_title("Baseline k")
-    axes[-1].set_xticks([])
-    axes[-1].set_yticks([])
-    fig.colorbar(image, ax=axes[-1], fraction=0.046, pad=0.04)
+    image = axes[3].imshow(baseline_stiffness, cmap="magma", vmin=k_vmin, vmax=k_vmax, interpolation="nearest")
+    axes[3].set_title("Stiffness map")
+    axes[3].set_xticks([])
+    axes[3].set_yticks([])
+    fig.colorbar(image, ax=axes[3], fraction=0.046, pad=0.04)
+    axes[4].imshow(baseline_kmeans, cmap="gray", vmin=0.0, vmax=1.0, interpolation="nearest")
+    axes[4].set_title("K-means mask")
+    axes[4].set_xticks([])
+    axes[4].set_yticks([])
     fig.suptitle(f"{title}  Dice={metrics['dice']:.3f} IoU={metrics['iou']:.3f} Acc={metrics['pixel_accuracy']:.3f}")
     fig.savefig(path, dpi=180)
     plt.close(fig)
@@ -520,18 +564,19 @@ def _set_equal_3d(ax, xlim: tuple[float, float], ylim: tuple[float, float], zlim
 
 def _save_contact_sheet(path: Path, visuals) -> None:
     n = len(visuals)
-    ncols = 4
+    ncols = 5
     fig, axes = plt.subplots(n, ncols, figsize=(2.8 * ncols, max(2.0, 2.25 * n)), constrained_layout=True)
     if n == 1:
         axes = axes[None, :]
-    for row, (name, prob, pred, gt, baseline_stiffness, metrics) in enumerate(visuals):
+    for row, (name, prob, pred, gt, baseline_stiffness, baseline_kmeans, metrics) in enumerate(visuals):
         k_vmin, k_vmax = _stiffness_limits(baseline_stiffness)
         panels = [(gt, "GT", "gray", 0.0, 1.0)]
         panels.extend(
             [
                 (prob, "Prob", "viridis", 0.0, 1.0),
                 (pred, "Pred", "gray", 0.0, 1.0),
-                (baseline_stiffness, "Baseline k", "magma", k_vmin, k_vmax),
+                (baseline_stiffness, "Stiffness map", "magma", k_vmin, k_vmax),
+                (baseline_kmeans, "K-means mask", "gray", 0.0, 1.0),
             ]
         )
         for col, (data, panel_name, cmap, vmin, vmax) in enumerate(panels):

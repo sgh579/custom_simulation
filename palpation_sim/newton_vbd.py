@@ -42,7 +42,13 @@ class NewtonVBDPalpationSimulator:
         self.newton, self.wp, self.SolverVBD = _import_newton(newton_root)
         self.device = _resolve_device(self.wp, device)
 
-    def run_sample(self, lumps: LumpSpec | Sequence[LumpSpec]) -> dict[str, np.ndarray | str]:
+    def run_sample(
+        self,
+        lumps: LumpSpec | Sequence[LumpSpec],
+        *,
+        trajectory_xy_offsets: np.ndarray | None = None,
+        trajectory_metadata: dict[str, Any] | None = None,
+    ) -> dict[str, np.ndarray | str]:
         lump_list = normalize_lumps(lumps)
         mesh = create_structured_tet_mesh(self.phantom)
         k_mu, k_lambda, k_damp, tet_lump_mask, tet_lump_id = material_arrays_for_lumps(mesh, self.material, lump_list)
@@ -72,11 +78,15 @@ class NewtonVBDPalpationSimulator:
         ys = np.asarray(scan.y_values(self.phantom), dtype=np.float32)
         depths = np.asarray(scan.indentation_values(), dtype=np.float32)
         h, w, t = scan.grid_h, scan.grid_w, scan.press_steps
+        trajectory_xy_offsets = _validate_trajectory_xy_offsets(trajectory_xy_offsets, h, w, t)
 
         presses = np.zeros((h, w, t, 2), dtype=np.float32)
         probe_pose = np.zeros((h, w, t, 7), dtype=np.float32)
         indentation = np.broadcast_to(depths, (h, w, t)).copy().astype(np.float32)
         fz = np.zeros((h, w, t), dtype=np.float32)
+        probe_force = np.zeros((h, w, t, 3), dtype=np.float32)
+        probe_torque = np.zeros((h, w, t, 3), dtype=np.float32)
+        probe_wrench = np.zeros((h, w, t, 6), dtype=np.float32)
         contact_features = np.zeros((h, w, t, 5), dtype=np.float32)
 
         for row, y in enumerate(ys):
@@ -85,36 +95,59 @@ class NewtonVBDPalpationSimulator:
                     _reset_state(wp, state_0, state_1, initial_particle_q, initial_body_q)
 
                 previous_z = self.phantom.height + scan.probe_radius + scan.preload_gap
+                previous_x = float(x) + float(trajectory_xy_offsets[row, col, 0, 0])
+                previous_y = float(y) + float(trajectory_xy_offsets[row, col, 0, 1])
                 substeps = max(int(scan.sim_substeps_per_depth), 1)
                 for step, depth in enumerate(depths):
+                    target_x = float(x) + float(trajectory_xy_offsets[row, col, step, 0])
+                    target_y = float(y) + float(trajectory_xy_offsets[row, col, step, 1])
                     target_z = self.phantom.height + scan.probe_radius + scan.preload_gap - float(depth)
 
                     for substep in range(substeps):
                         alpha_0 = float(substep) / float(substeps)
                         alpha_1 = float(substep + 1) / float(substeps)
+                        x_0 = previous_x + (target_x - previous_x) * alpha_0
+                        x_1 = previous_x + (target_x - previous_x) * alpha_1
+                        y_0 = previous_y + (target_y - previous_y) * alpha_0
+                        y_1 = previous_y + (target_y - previous_y) * alpha_1
                         z_0 = previous_z + (target_z - previous_z) * alpha_0
                         z_1 = previous_z + (target_z - previous_z) * alpha_1
+                        vx = (x_1 - x_0) / max(scan.sim_dt, 1e-9)
+                        vy = (y_1 - y_0) / max(scan.sim_dt, 1e-9)
                         vz = (z_1 - z_0) / max(scan.sim_dt, 1e-9)
                         state_0.clear_forces()
                         state_1.clear_forces()
                         _copy_particle_state(state_0, state_1)
-                        _set_probe_kinematic_pose(wp, model, state_0, probe_body, float(x), float(y), z_0, vz)
-                        _set_probe_kinematic_pose(wp, model, state_1, probe_body, float(x), float(y), z_1, vz)
+                        _set_probe_kinematic_pose(wp, model, state_0, probe_body, x_0, y_0, z_0, vx, vy, vz)
+                        _set_probe_kinematic_pose(wp, model, state_1, probe_body, x_1, y_1, z_1, vx, vy, vz)
                         if hasattr(solver, "rebuild_bvh"):
                             solver.rebuild_bvh(state_0)
                         collision_pipeline.collide(state_1, contacts)
                         solver.step(state_0, state_1, control, contacts, scan.sim_dt)
                         state_0, state_1 = state_1, state_0
 
-                    _set_probe_kinematic_pose(wp, model, state_0, probe_body, float(x), float(y), target_z, 0.0)
+                    _set_probe_kinematic_pose(wp, model, state_0, probe_body, target_x, target_y, target_z, 0.0, 0.0, 0.0)
                     collision_pipeline.collide(state_0, contacts)
-                    force_z, patch = _estimate_probe_reaction_z(model, state_0, contacts, solver, probe_shape, self.material)
+                    wrench, patch = _estimate_probe_reaction_wrench(
+                        model,
+                        state_0,
+                        contacts,
+                        solver,
+                        probe_shape,
+                        self.material,
+                    )
+                    force_z = max(float(wrench[2]), 0.0)
 
                     presses[row, col, step, 0] = depth
                     presses[row, col, step, 1] = force_z
                     fz[row, col, step] = force_z
-                    probe_pose[row, col, step] = np.asarray([x, y, target_z, 0.0, 0.0, 0.0, 1.0], dtype=np.float32)
+                    probe_force[row, col, step] = wrench[:3]
+                    probe_torque[row, col, step] = wrench[3:]
+                    probe_wrench[row, col, step] = wrench
+                    probe_pose[row, col, step] = np.asarray([target_x, target_y, target_z, 0.0, 0.0, 0.0, 1.0], dtype=np.float32)
                     contact_features[row, col, step] = patch
+                    previous_x = target_x
+                    previous_y = target_y
                     previous_z = target_z
 
         nonlinearity_ratio = _nonlinearity_ratio_map(indentation, fz)
@@ -125,8 +158,13 @@ class NewtonVBDPalpationSimulator:
             "mask": mask_for_scan_grid(scan, self.phantom, lump_list),
             "xy": xy_grid,
             "probe_pose": probe_pose,
+            "trajectory_xy_offset": trajectory_xy_offsets,
+            "trajectory_json": np.asarray(json.dumps(trajectory_metadata or {"mode": "straight"})),
             "indentation_depth": indentation,
             "fz": fz,
+            "probe_force": probe_force,
+            "probe_torque": probe_torque,
+            "probe_wrench": probe_wrench,
             "contact_features": contact_features,
             "nonlinearity_ratio": nonlinearity_ratio,
             "tet_lump_mask": tet_lump_mask,
@@ -273,6 +311,18 @@ def _copy_particle_state(state_in: Any, state_out: Any) -> None:
     state_out.particle_qd.assign(state_in.particle_qd)
 
 
+def _validate_trajectory_xy_offsets(offsets: np.ndarray | None, h: int, w: int, t: int) -> np.ndarray:
+    if offsets is None:
+        return np.zeros((h, w, t, 2), dtype=np.float32)
+    array = np.asarray(offsets, dtype=np.float32)
+    expected_shape = (h, w, t, 2)
+    if array.shape != expected_shape:
+        raise ValueError(f"trajectory_xy_offsets must have shape {expected_shape}, got {array.shape}")
+    if not np.all(np.isfinite(array)):
+        raise ValueError("trajectory_xy_offsets contains non-finite values")
+    return array
+
+
 def _set_probe_kinematic_pose(
     wp: Any,
     model: Any,
@@ -281,6 +331,8 @@ def _set_probe_kinematic_pose(
     x: float,
     y: float,
     z: float,
+    vx: float,
+    vy: float,
     vz: float,
 ) -> None:
     body_q = state.body_q.numpy()
@@ -288,26 +340,26 @@ def _set_probe_kinematic_pose(
     state.body_q = wp.array(body_q, dtype=wp.transform, device=model.device)
 
     body_qd = state.body_qd.numpy()
-    body_qd[body_index] = np.asarray([0.0, 0.0, vz, 0.0, 0.0, 0.0], dtype=np.float32)
+    body_qd[body_index] = np.asarray([vx, vy, vz, 0.0, 0.0, 0.0], dtype=np.float32)
     state.body_qd = wp.array(body_qd, dtype=wp.spatial_vector, device=model.device)
 
 
-def _estimate_probe_reaction_z(
+def _estimate_probe_reaction_wrench(
     model: Any,
     state: Any,
     contacts: Any,
     solver: Any,
     probe_shape: int,
     material: MaterialConfig,
-) -> tuple[float, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     count = int(contacts.soft_contact_count.numpy()[0])
     if count <= 0:
-        return 0.0, np.zeros(5, dtype=np.float32)
+        return np.zeros(6, dtype=np.float32), np.zeros(5, dtype=np.float32)
 
     shape = contacts.soft_contact_shape.numpy()[:count]
     keep = shape == probe_shape
     if not np.any(keep):
-        return 0.0, np.zeros(5, dtype=np.float32)
+        return np.zeros(6, dtype=np.float32), np.zeros(5, dtype=np.float32)
 
     idx = np.nonzero(keep)[0]
     particles = contacts.soft_contact_particle.numpy()[:count][idx].astype(np.int64)
@@ -328,7 +380,12 @@ def _estimate_probe_reaction_z(
         ke = np.full(idx.shape[0], 0.5 * (material.soft_contact_ke + shape_ke), dtype=np.float32)
 
     particle_force = normals * (penetration * ke)[:, None]
-    reaction_z = float(-np.sum(particle_force[:, 2]))
+    contact_force_on_probe = -particle_force
+    force = np.sum(contact_force_on_probe, axis=0).astype(np.float32)
+    probe_center = body_q[:3].astype(np.float32)
+    moment_arms = bx - probe_center[None, :]
+    torque = np.sum(np.cross(moment_arms, contact_force_on_probe), axis=0).astype(np.float32)
+    wrench = np.concatenate((force, torque)).astype(np.float32)
     patch = np.asarray(
         [
             float(idx.shape[0]),
@@ -339,7 +396,7 @@ def _estimate_probe_reaction_z(
         ],
         dtype=np.float32,
     )
-    return max(reaction_z, 0.0), patch
+    return wrench, patch
 
 
 def _transform_points(transform: np.ndarray, points: np.ndarray) -> np.ndarray:

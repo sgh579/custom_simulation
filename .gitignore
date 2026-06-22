@@ -33,9 +33,26 @@ runs/**
 outputs/**
 !outputs/.gitkeep
 artifacts/**
+!artifacts/
 !artifacts/.gitkeep
+!artifacts/README.md
+!artifacts/manifests/
+!artifacts/manifests/.gitkeep
+!artifacts/manifests/*.json
+!artifacts/manifests/*.jsonl
+!artifacts/transfer_packages/
+!artifacts/transfer_packages/.gitkeep
 checkpoints/**
 !checkpoints/.gitkeep
+models/**
+!models/
+!models/**/
+!models/.gitkeep
+!models/README.md
+!models/.gitignore
+!models/**/*.dvc
+!models/**/.gitignore
+!models/**/metadata.json
 
 # Generated viewer sidecar files
 tools/_models/
@@ -64,6 +81,7 @@ tools/.phantom_viewer_server_*.log
 *_map.png
 
 # Logs and temporary files
+.logs/
 *.log
 *.tmp
 *.temp

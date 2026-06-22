@@ -32,6 +32,9 @@ def run_analytic_sample(
     probe_pose = np.zeros((h, w, t, 7), dtype=np.float32)
     indentation = np.broadcast_to(depths, (h, w, t)).copy().astype(np.float32)
     fz = np.zeros((h, w, t), dtype=np.float32)
+    probe_force = np.zeros((h, w, t, 3), dtype=np.float32)
+    probe_torque = np.zeros((h, w, t, 3), dtype=np.float32)
+    probe_wrench = np.zeros((h, w, t, 6), dtype=np.float32)
     contact_features = np.zeros((h, w, t, 5), dtype=np.float32)
 
     lump_list = normalize_lumps(lumps)
@@ -69,6 +72,8 @@ def run_analytic_sample(
             presses[row, col, :, 0] = depths
             presses[row, col, :, 1] = force
             fz[row, col] = force
+            probe_force[row, col, :, 2] = force
+            probe_wrench[row, col, :, 2] = force
             contact_features[row, col, :, 0] = np.clip(depths / max(scan.max_indentation, 1e-6), 0.0, 1.0) * 12.0
             contact_features[row, col, :, 1] = np.maximum(depths - scan.preload_gap, 0.0)
             contact_features[row, col, :, 2] = z
@@ -85,6 +90,9 @@ def run_analytic_sample(
         "probe_pose": probe_pose,
         "indentation_depth": indentation,
         "fz": fz,
+        "probe_force": probe_force,
+        "probe_torque": probe_torque,
+        "probe_wrench": probe_wrench,
         "contact_features": contact_features,
         "lump_json": first_lump_json,
         "lumps_json": lumps_to_json(lump_list, phantom),
