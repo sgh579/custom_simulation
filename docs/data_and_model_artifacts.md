@@ -35,6 +35,14 @@ python scripts/artifact_sync.py pull \
   --remote-root /home/guoheng/custom_simulation
 ```
 
+Verify the copied paths against the manifest after every transfer:
+
+```bash
+python scripts/artifact_sync.py verify \
+  --manifest artifacts/manifests/nonlinear_trajectory_20260620.json \
+  --target local
+```
+
 Sync selected local packages to `lab204`:
 
 ```bash
@@ -42,6 +50,35 @@ python scripts/artifact_sync.py push \
   --manifest artifacts/manifests/local_transfer_packages.json \
   --remote lab204 \
   --remote-root /home/guoheng/custom_simulation
+```
+
+Verify remote paths from the Mac when `lab204` is the target:
+
+```bash
+python scripts/artifact_sync.py verify \
+  --manifest artifacts/manifests/local_transfer_packages.json \
+  --target remote \
+  --remote lab204 \
+  --remote-root /home/guoheng/custom_simulation
+```
+
+Use deletion only as a deliberate cleanup step. First run `--dry-run`; the real command must also include `--confirm-delete` with the exact manifest name:
+
+```bash
+python scripts/artifact_sync.py pull \
+  --manifest artifacts/manifests/nonlinear_trajectory_20260620.json \
+  --remote lab204 \
+  --remote-root /home/guoheng/custom_simulation \
+  --delete \
+  --confirm-delete nonlinear_trajectory_20260620
+```
+
+The local cleanup backup from 2026-06-22 is recorded in `artifacts/manifests/mac_cleanup_backup_20260622_1537.json`; the actual files live on `lab204` under `artifacts/mac_cleanup_backup_20260622_1537/`.
+
+Before committing, check that generated artifacts have not leaked into Git:
+
+```bash
+python scripts/check_git_artifact_policy.py
 ```
 
 ## Model Versioning With DVC
@@ -60,6 +97,8 @@ The committed default remote is:
 ssh://lab204/home/guoheng/dvc-remotes/custom_simulation-models
 ```
 
+This is an internal remote for the three-copy workflow. Public users can read the `.dvc` pointers, but `dvc pull` requires access to `lab204` or a separately published DVC remote.
+
 On `lab204`, use a local override:
 
 ```bash
@@ -75,6 +114,8 @@ python scripts/register_model_artifact.py \
   --name unet_fz_features_aug_focal_20x4seed \
   --run-dir runs/segmentation_accuracy_sweep_20x_4seed/unet_fz_features_aug_focal
 ```
+
+The registration script refuses a dirty Git worktree by default and records checkpoint size and SHA-256 in metadata. Use `--allow-dirty` only for intentionally preserved legacy or emergency artifacts, and explain that in `--description`.
 
 Then push model content to the DVC remote:
 

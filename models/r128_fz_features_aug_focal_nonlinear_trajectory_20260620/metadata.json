@@ -6,6 +6,11 @@
     "commit": "a409d59226bee05aaf9719962ef7a03dfa549574",
     "dirty": true
   },
+  "metadata_revision": {
+    "hash_basis": "DVC-registered model_file; original generated run directories are managed outside Git.",
+    "reason": "Clarify legacy dirty Git provenance and add immutable checkpoint hashes after repository synchronization.",
+    "updated_at": "2026-06-22T05:44:30.146407+00:00"
+  },
   "metrics_summary": {
     "config": {
       "augment": true,
@@ -145,8 +150,16 @@
     }
   },
   "model_file": "models/r128_fz_features_aug_focal_nonlinear_trajectory_20260620/best.pt",
+  "model_file_sha256": "3c24a79832615581974ade248a66f343735251ed414c24d7fcab73c58cc73ef0",
+  "model_file_size_bytes": 4424201,
   "name": "r128_fz_features_aug_focal_nonlinear_trajectory_20260620",
   "registered_at": "2026-06-22T05:33:35.535023+00:00",
+  "registration_git": {
+    "available": true,
+    "branch": "dev",
+    "commit": "a409d59226bee05aaf9719962ef7a03dfa549574",
+    "dirty": true
+  },
   "run_config": {
     "augment": true,
     "augmentation": "d4",
@@ -258,5 +271,13 @@
   },
   "run_dir": "runs/nonlinear_trajectory_20x_repeats10_seed20260618/highres_fz_temporal_variants/r128_fz_features_aug_focal_unet",
   "schema_version": 1,
-  "source_checkpoint": "runs/nonlinear_trajectory_20x_repeats10_seed20260618/highres_fz_temporal_variants/r128_fz_features_aug_focal_unet/best.pt"
+  "source_checkpoint": "runs/nonlinear_trajectory_20x_repeats10_seed20260618/highres_fz_temporal_variants/r128_fz_features_aug_focal_unet/best.pt",
+  "source_checkpoint_sha256": "3c24a79832615581974ade248a66f343735251ed414c24d7fcab73c58cc73ef0",
+  "source_checkpoint_size_bytes": 4424201,
+  "source_git": {
+    "available": true,
+    "branch": "dev",
+    "commit": "a409d59226bee05aaf9719962ef7a03dfa549574",
+    "dirty": true
+  }
 }

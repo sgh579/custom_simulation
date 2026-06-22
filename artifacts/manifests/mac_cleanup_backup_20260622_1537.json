@@ -1,0 +1,21 @@
+{
+  "created_at": "2026-06-22T05:44:35.828387+00:00",
+  "entries": [
+    {
+      "file_count": 12598,
+      "kind": "directory",
+      "path": "artifacts/mac_cleanup_backup_20260622_1537",
+      "size_bytes": 2716611182
+    }
+  ],
+  "git": {
+    "available": true,
+    "branch": "dev",
+    "commit": "2ec56397bae2d97ceb0c7159a6cfb563f76bf6d5",
+    "dirty": false
+  },
+  "host": "sicong-Alienware-Area-51-AAT2250",
+  "name": "mac_cleanup_backup_20260622_1537",
+  "repo_root": "/home/guoheng/custom_simulation",
+  "schema_version": 1
+}

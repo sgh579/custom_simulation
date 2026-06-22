@@ -6,6 +6,11 @@
     "commit": "a409d59226bee05aaf9719962ef7a03dfa549574",
     "dirty": true
   },
+  "metadata_revision": {
+    "hash_basis": "DVC-registered model_file; original generated run directories are managed outside Git.",
+    "reason": "Clarify legacy dirty Git provenance and add immutable checkpoint hashes after repository synchronization.",
+    "updated_at": "2026-06-22T05:44:30.149551+00:00"
+  },
   "metrics_summary": {
     "config": {
       "augment": true,
@@ -70,8 +75,16 @@
     }
   },
   "model_file": "models/unet_fz_features_aug_focal_20x4seed/best.pt",
+  "model_file_sha256": "45357b774fdc06765b4000ace9aa3aa5631fe5dbf2ea3246c543ef460932668b",
+  "model_file_size_bytes": 4421641,
   "name": "unet_fz_features_aug_focal_20x4seed",
   "registered_at": "2026-06-22T05:33:35.099799+00:00",
+  "registration_git": {
+    "available": true,
+    "branch": "dev",
+    "commit": "a409d59226bee05aaf9719962ef7a03dfa549574",
+    "dirty": true
+  },
   "run_config": {
     "augment": true,
     "augmentation": "d4",
@@ -108,5 +121,13 @@
   },
   "run_dir": "runs/segmentation_accuracy_sweep_20x_4seed/unet_fz_features_aug_focal",
   "schema_version": 1,
-  "source_checkpoint": "runs/segmentation_accuracy_sweep_20x_4seed/unet_fz_features_aug_focal/best.pt"
+  "source_checkpoint": "runs/segmentation_accuracy_sweep_20x_4seed/unet_fz_features_aug_focal/best.pt",
+  "source_checkpoint_sha256": "45357b774fdc06765b4000ace9aa3aa5631fe5dbf2ea3246c543ef460932668b",
+  "source_checkpoint_size_bytes": 4421641,
+  "source_git": {
+    "available": true,
+    "branch": "dev",
+    "commit": "a409d59226bee05aaf9719962ef7a03dfa549574",
+    "dirty": true
+  }
 }
