@@ -53,7 +53,7 @@
         128,
         128
       ],
-      "package_dir": "runs/dataset_packages/palpation_nonlinear_trajectory_20x_100p40p40_repeats10_seed20260618",
+      "package_dir": "data/palpation_synthetic_depth_modes_1000train_400val_400test_20260622/random_trajectory",
       "patience": 15,
       "positional_embedding_dim": 8,
       "resolution": 128,
@@ -88,12 +88,12 @@
         "fz_contact_time",
         "fz_contact_to_peak"
       ],
-      "test_dir": "runs/dataset_packages/palpation_nonlinear_trajectory_20x_100p40p40_repeats10_seed20260618/data/test",
+      "test_dir": "data/palpation_synthetic_depth_modes_1000train_400val_400test_20260622/random_trajectory/data/test",
       "test_samples": 400,
-      "train_dir": "runs/dataset_packages/palpation_nonlinear_trajectory_20x_100p40p40_repeats10_seed20260618/data/train",
+      "train_dir": "data/palpation_synthetic_depth_modes_1000train_400val_400test_20260622/random_trajectory/data/train",
       "train_samples": 1000,
       "trajectory_input_steps": 0,
-      "val_dir": "runs/dataset_packages/palpation_nonlinear_trajectory_20x_100p40p40_repeats10_seed20260618/data/val",
+      "val_dir": "data/palpation_synthetic_depth_modes_1000train_400val_400test_20260622/random_trajectory/data/val",
       "val_samples": 400,
       "variant": "fz_features_aug_focal_unet",
       "variants": [
@@ -201,7 +201,7 @@
       128,
       128
     ],
-    "package_dir": "runs/dataset_packages/palpation_nonlinear_trajectory_20x_100p40p40_repeats10_seed20260618",
+    "package_dir": "data/palpation_synthetic_depth_modes_1000train_400val_400test_20260622/random_trajectory",
     "patience": 15,
     "positional_embedding_dim": 8,
     "resolution": 128,
@@ -236,12 +236,12 @@
       "fz_contact_time",
       "fz_contact_to_peak"
     ],
-    "test_dir": "runs/dataset_packages/palpation_nonlinear_trajectory_20x_100p40p40_repeats10_seed20260618/data/test",
+    "test_dir": "data/palpation_synthetic_depth_modes_1000train_400val_400test_20260622/random_trajectory/data/test",
     "test_samples": 400,
-    "train_dir": "runs/dataset_packages/palpation_nonlinear_trajectory_20x_100p40p40_repeats10_seed20260618/data/train",
+    "train_dir": "data/palpation_synthetic_depth_modes_1000train_400val_400test_20260622/random_trajectory/data/train",
     "train_samples": 1000,
     "trajectory_input_steps": 0,
-    "val_dir": "runs/dataset_packages/palpation_nonlinear_trajectory_20x_100p40p40_repeats10_seed20260618/data/val",
+    "val_dir": "data/palpation_synthetic_depth_modes_1000train_400val_400test_20260622/random_trajectory/data/val",
     "val_samples": 400,
     "variant": "fz_features_aug_focal_unet",
     "variants": [

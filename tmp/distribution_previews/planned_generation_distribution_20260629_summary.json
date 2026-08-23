@@ -1,0 +1,87 @@
+{
+  "dataset_total_samples": 3600,
+  "lump_stiffness_ratio": {
+    "max": 30.0,
+    "mean": 17.5,
+    "min": 5.0,
+    "per_split": {
+      "test": {
+        "lumps": 1996,
+        "max": 30.0,
+        "mean": 17.499999999999996,
+        "min": 5.0
+      },
+      "train": {
+        "lumps": 4990,
+        "max": 30.0,
+        "mean": 17.5,
+        "min": 5.0
+      },
+      "val": {
+        "lumps": 2060,
+        "max": 30.0,
+        "mean": 17.5,
+        "min": 5.0
+      }
+    },
+    "schedule": "linear coverage over lump instances within each split",
+    "total_lumps": 9046
+  },
+  "normal_stiffness": {
+    "max": 12000.0,
+    "mean": 10000.0,
+    "min": 8000.0,
+    "per_split": {
+      "test": {
+        "count": 800,
+        "max": 12000.0,
+        "mean": 10000.0,
+        "min": 8000.0
+      },
+      "train": {
+        "count": 2000,
+        "max": 12000.0,
+        "mean": 10000.0,
+        "min": 8000.0
+      },
+      "val": {
+        "count": 800,
+        "max": 12000.0,
+        "mean": 10000.0,
+        "min": 8000.0
+      }
+    },
+    "schedule": "linear coverage within each split, optionally deterministic-permuted before generation"
+  },
+  "planned_lump_counts": {
+    "test": {
+      "1": 202,
+      "2": 194,
+      "3": 210,
+      "4": 194
+    },
+    "train": {
+      "1": 506,
+      "2": 534,
+      "3": 424,
+      "4": 536
+    },
+    "val": {
+      "1": 198,
+      "2": 166,
+      "3": 214,
+      "4": 222
+    }
+  },
+  "press_depth": {
+    "max_mm": 36.0,
+    "min_mm": 0.0,
+    "step_spacing_mm": 0.9230769230769231,
+    "steps": 40
+  },
+  "split_counts": {
+    "test": 800,
+    "train": 2000,
+    "val": 800
+  }
+}

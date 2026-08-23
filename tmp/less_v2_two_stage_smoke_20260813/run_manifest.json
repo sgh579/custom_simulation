@@ -1,0 +1,118 @@
+{
+  "config": {
+    "amp": true,
+    "batch_size": 2,
+    "data_root": "/home/guoheng/custom_simulation/data/palpation_fixed_depth_36mm_40step_ecoflex0010_ref55k_100pctmodulus_pm20pct_linear_2000train_800val_800test_20260702",
+    "decoder_channels": 64,
+    "decoder_epochs": 1,
+    "decoder_learning_rate": 0.002,
+    "embedding_dim": 128,
+    "log_every": 1,
+    "num_workers": 0,
+    "output_dir": "/home/guoheng/custom_simulation/tmp/less_v2_two_stage_smoke_20260813",
+    "particle_radius_m": 0.0136,
+    "patch_size": 5,
+    "pretrain_epochs": 1,
+    "pretrain_learning_rate": 0.002,
+    "representation_dim": 128,
+    "seed": 9400,
+    "test_samples": 2,
+    "train_samples": 2,
+    "val_samples": 2,
+    "volume_depth": 16,
+    "weight_decay": 1e-05
+  },
+  "data_qa": {
+    "test": {
+      "positive_fraction_2d": 0.08874999731779099,
+      "positive_fraction_3d": 0.013437500223517418,
+      "projection_consistency_mean": 1.0,
+      "projection_consistency_min": 1.0,
+      "samples": 2
+    },
+    "train": {
+      "positive_fraction_2d": 0.07374999672174454,
+      "positive_fraction_3d": 0.010859374888241291,
+      "projection_consistency_mean": 1.0,
+      "projection_consistency_min": 1.0,
+      "samples": 2
+    },
+    "val": {
+      "positive_fraction_2d": 0.04874999821186066,
+      "positive_fraction_3d": 0.021953124552965164,
+      "projection_consistency_mean": 1.0,
+      "projection_consistency_min": 1.0,
+      "samples": 2
+    }
+  },
+  "decoder": {
+    "combination": "additive overlap, matching released LESS default",
+    "patch_fraction_of_20_pixel_canvas": 0.25,
+    "patch_size_pixels": 5,
+    "three_dimensional": "16x5x5 patch",
+    "two_dimensional": "5x5 patch",
+    "type": "independent per-particle transposed-convolution patch prediction"
+  },
+  "environment": {
+    "cuda": "12.8",
+    "cuda_available": true,
+    "git_head_custom_simulation": "b20ff795a83125a37d0e1e2a3ab4286f4ca3a2a1",
+    "gpu": "NVIDIA GeForce RTX 5090",
+    "hostname": "sicong-Alienware-Area-51-AAT2250",
+    "python": "3.9.25 (main, Nov  3 2025, 22:33:05) \n[GCC 11.2.0]",
+    "script_sha256": "b8445bc5fe6b75f0f3e2951470dfdb7e03f37ec43a240abd9d9dce0f3fdaefc3",
+    "torch": "2.7.1+cu128"
+  },
+  "input_semantics": "preload-subtracted delta Fz, log1p, train-set normalization; one 40-step curve per scan location",
+  "kind": "two-stage LESS port for synthetic palpation V2",
+  "normalization": {
+    "depth_scale": 0.036,
+    "force_log_mean": 3.6465320587158203,
+    "force_log_std": 1.0338845252990723,
+    "xy_scale": 0.075
+  },
+  "parameter_count_stage1": 214696,
+  "particles": {
+    "assignment": "Euclidean cdist in unnormalised physical XY coordinates",
+    "distribution": "fixed particles at the shared V2 physical XY scan coordinates",
+    "grid_shape": [
+      20,
+      20
+    ],
+    "grid_step_x_m": 0.007894737645983696,
+    "grid_step_y_m": 0.007894737645983696,
+    "max_neighbours": 9,
+    "max_particle_distance_m": 0.0136,
+    "mean_neighbours": 8.41,
+    "min_neighbours": 4,
+    "num_particles": 400,
+    "x_range_m": [
+      -0.07500000298023224,
+      0.07500000298023224
+    ],
+    "y_range_m": [
+      -0.07500000298023224,
+      0.07500000298023224
+    ]
+  },
+  "selected_samples": {
+    "test": [
+      "sample_0375.npz",
+      "sample_0467.npz"
+    ],
+    "train": [
+      "sample_0389.npz",
+      "sample_1894.npz"
+    ],
+    "val": [
+      "sample_0141.npz",
+      "sample_0591.npz"
+    ]
+  },
+  "training_contract": {
+    "joint_end_to_end_training": false,
+    "stage1": "self-supervised held-out local force-curve reconstruction; no 2D/3D labels",
+    "stage2_2d": "load best stage1 representation, freeze it, train only particle TCNN 2D decoder",
+    "stage2_3d": "load the same frozen representation, train only particle TCNN 3D decoder"
+  }
+}

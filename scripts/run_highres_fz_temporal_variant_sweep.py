@@ -42,10 +42,19 @@ from run_segmentation_accuracy_sweep import (
 )
 
 
-DEFAULT_OUT_DIR = Path("runs/highres_fz_temporal_variant_sweep_800_80_80")
-BASELINE_SWEEP_DIR = Path("runs/highres_segmentation_sweep_800_80_80")
+DEFAULT_OUT_DIR = Path("runs/highres_wrench_temporal_variant_sweep_800_80_80")
+BASELINE_SWEEP_DIR = Path("runs/highres_wrench_segmentation_sweep_800_80_80")
 DEFAULT_RESOLUTIONS = (64,)
 DEFAULT_VARIANTS = (
+    "wrench_unet_aug_focal",
+    "wrench_temporal_cnn16_unet",
+    "wrench_temporal_cnn32_unet",
+    "wrench_temporal_gru32_unet",
+    "wrench_temporal_attention32_unet",
+    "wrench_temporal_multiscale32_unet",
+)
+OPTIONAL_WRENCH_VARIANTS = ("wrench_unet",)
+LEGACY_FZ_VARIANTS = (
     "fz_stats_unet",
     "fz_stats_stiffness_unet",
     "fz_delta_unet",
@@ -69,6 +78,7 @@ DEFAULT_VARIANTS = (
     "limited_sincos_temporal_attention32_unet",
     "limited_sincos_temporal_multiscale32_unet",
 )
+WRENCH_CHANNEL_NAMES = ["Fx", "Fy", "Fz", "Mx", "My", "Mz"]
 TEMPORAL_STAT_NAMES = [
     "fz_initial",
     "fz_final",
@@ -361,7 +371,7 @@ class PointwiseMultiScaleTemporalConvUNet(nn.Module):
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Try temporal raw-Fz variants for high-resolution mask segmentation.")
+    parser = argparse.ArgumentParser(description="Try 6D wrench temporal variants for high-resolution mask segmentation.")
     parser.add_argument("--package-dir", type=Path, default=DEFAULT_PACKAGE_DIR)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--baseline-sweep-dir", type=Path, default=BASELINE_SWEEP_DIR)
@@ -465,6 +475,108 @@ def build_variant(
     test: SplitData,
     args: argparse.Namespace,
 ) -> VariantBatch:
+    if variant == "wrench_unet":
+        x_train, x_val, x_test = normalized_wrench(train, val, test, args)
+        return VariantBatch(
+            method=f"r{resolution}_{variant}",
+            input_name="probe_wrench",
+            model_name="unet",
+            x_train=x_train,
+            x_val=x_val,
+            x_test=x_test,
+            model=UpsampleLogits(ValidationUNet(x_train.shape[1], base_channels=24), (resolution, resolution)),
+            context_extra=wrench_context(x_train),
+        )
+    if variant == "wrench_unet_aug_focal":
+        x_train, x_val, x_test = normalized_wrench(train, val, test, args)
+        return VariantBatch(
+            method=f"r{resolution}_{variant}",
+            input_name="probe_wrench",
+            model_name="unet_aug_focal",
+            x_train=x_train,
+            x_val=x_val,
+            x_test=x_test,
+            model=UpsampleLogits(ValidationUNet(x_train.shape[1], base_channels=24), (resolution, resolution)),
+            context_extra={**wrench_context(x_train), "augmentation": "d4", "loss": "focal_bce_dice"},
+            augment=True,
+            focal=True,
+        )
+    if variant == "wrench_temporal_cnn16_unet":
+        x_train, x_val, x_test = normalized_wrench(train, val, test, args)
+        return temporal_cnn_batch(
+            variant,
+            resolution,
+            x_train,
+            x_val,
+            x_test,
+            embed_channels=16,
+            extra_channels=0,
+            temporal_feature_size=len(WRENCH_CHANNEL_NAMES),
+            input_name="probe_wrench",
+            context_extra=wrench_context(x_train),
+        )
+    if variant == "wrench_temporal_cnn32_unet":
+        x_train, x_val, x_test = normalized_wrench(train, val, test, args)
+        return temporal_cnn_batch(
+            variant,
+            resolution,
+            x_train,
+            x_val,
+            x_test,
+            embed_channels=32,
+            extra_channels=0,
+            temporal_feature_size=len(WRENCH_CHANNEL_NAMES),
+            input_name="probe_wrench",
+            context_extra=wrench_context(x_train),
+        )
+    if variant == "wrench_temporal_gru32_unet":
+        x_train, x_val, x_test = normalized_wrench(train, val, test, args)
+        return temporal_encoder_batch(
+            variant,
+            "wrench_temporal_gru32_unet",
+            "gru",
+            resolution,
+            x_train,
+            x_val,
+            x_test,
+            embed_channels=32,
+            extra_channels=0,
+            temporal_feature_size=len(WRENCH_CHANNEL_NAMES),
+            input_name="probe_wrench",
+            context_extra=wrench_context(x_train),
+        )
+    if variant == "wrench_temporal_attention32_unet":
+        x_train, x_val, x_test = normalized_wrench(train, val, test, args)
+        return temporal_encoder_batch(
+            variant,
+            "wrench_temporal_attention32_unet",
+            "attention",
+            resolution,
+            x_train,
+            x_val,
+            x_test,
+            embed_channels=32,
+            extra_channels=0,
+            temporal_feature_size=len(WRENCH_CHANNEL_NAMES),
+            input_name="probe_wrench",
+            context_extra=wrench_context(x_train),
+        )
+    if variant == "wrench_temporal_multiscale32_unet":
+        x_train, x_val, x_test = normalized_wrench(train, val, test, args)
+        return temporal_encoder_batch(
+            variant,
+            "wrench_temporal_multiscale32_unet",
+            "multiscale",
+            resolution,
+            x_train,
+            x_val,
+            x_test,
+            embed_channels=32,
+            extra_channels=0,
+            temporal_feature_size=len(WRENCH_CHANNEL_NAMES),
+            input_name="probe_wrench",
+            context_extra=wrench_context(x_train),
+        )
     if variant == "fz_stats_unet":
         x_train, x_val, x_test = normalize_train_val_test(
             fz_temporal_stats(train.fz),
@@ -1053,6 +1165,32 @@ def normalized_features(
     return train_norm.astype(np.float32), val_norm.astype(np.float32), test_norm.astype(np.float32)
 
 
+def normalized_wrench(
+    train: SplitData,
+    val: SplitData,
+    test: SplitData,
+    args: argparse.Namespace,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    if train.wrench is None or val.wrench is None or test.wrench is None:
+        raise ValueError("6D wrench variants require probe_wrench in train/val/test samples.")
+    train_norm, val_norm, test_norm = normalize_train_val_test(train.wrench, val.wrench, test.wrench, mode=args.fz_normalize)
+    return train_norm, val_norm, require_array(test_norm)
+
+
+def wrench_context(x: np.ndarray) -> dict[str, Any]:
+    temporal_feature_size = len(WRENCH_CHANNEL_NAMES)
+    if x.shape[1] % temporal_feature_size != 0:
+        raise ValueError(f"Wrench input channels must be divisible by {temporal_feature_size}, got {x.shape[1]}")
+    return {
+        "wrench_channel_names": WRENCH_CHANNEL_NAMES,
+        "wrench_channel_order": WRENCH_CHANNEL_NAMES,
+        "input_contract": "probe_wrench[..., 6]",
+        "feature_layout": "per time step: [Fx, Fy, Fz, Mx, My, Mz]",
+        "temporal_feature_size": temporal_feature_size,
+        "wrench_steps": int(x.shape[1] // temporal_feature_size),
+    }
+
+
 def normalized_fz_features(
     train: SplitData,
     val: SplitData,
@@ -1135,7 +1273,7 @@ def read_baseline_rows(baseline_dir: Path) -> list[dict[str, Any]]:
 
 
 def write_report(path: Path, rows: list[dict[str, Any]]) -> None:
-    lines = ["# High-Resolution Raw-Fz Temporal Variant Sweep", ""]
+    lines = ["# High-Resolution Wrench Temporal Variant Sweep", ""]
     if rows:
         variant_rows = [row for row in rows if row["source"] == "variant"]
         lines.append(f"- Variant methods completed: {len(variant_rows)}")
@@ -1162,7 +1300,7 @@ def parse_int_list(raw: str) -> list[int]:
 
 def parse_variant_list(raw: str) -> list[str]:
     values = [part.strip() for part in raw.split(",") if part.strip()]
-    allowed = set(DEFAULT_VARIANTS)
+    allowed = set(DEFAULT_VARIANTS) | set(OPTIONAL_WRENCH_VARIANTS) | set(LEGACY_FZ_VARIANTS)
     unknown = sorted(set(values) - allowed)
     if unknown:
         raise SystemExit(f"Unknown variants: {unknown}; allowed: {sorted(allowed)}")

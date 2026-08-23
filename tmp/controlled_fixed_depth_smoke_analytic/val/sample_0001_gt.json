@@ -1,0 +1,467 @@
+{
+  "arrays": {
+    "backend": {
+      "dtype": "<U8",
+      "shape": []
+    },
+    "contact_features": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8,
+        5
+      ]
+    },
+    "controlled_schedule_json": {
+      "dtype": "<U247",
+      "shape": []
+    },
+    "fz": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8
+      ]
+    },
+    "indentation_depth": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8
+      ]
+    },
+    "label_extent_json": {
+      "dtype": "<U226",
+      "shape": []
+    },
+    "label_xy": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        2
+      ]
+    },
+    "mask": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6
+      ]
+    },
+    "num_lumps": {
+      "dtype": "int32",
+      "shape": []
+    },
+    "presses": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8,
+        2
+      ]
+    },
+    "probe_force": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8,
+        3
+      ]
+    },
+    "probe_pose": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8,
+        7
+      ]
+    },
+    "probe_torque": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8,
+        3
+      ]
+    },
+    "probe_wrench": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8,
+        6
+      ]
+    },
+    "scan_mask": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6
+      ]
+    },
+    "xy": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        2
+      ]
+    }
+  },
+  "backend": "analytic",
+  "controlled_schedule": {
+    "geometry_seed": 1066412042,
+    "global_index": 4,
+    "lump_count": 4,
+    "lump_stiffness_multipliers": [
+      17.5,
+      5.0,
+      13.333333333333334,
+      30.0
+    ],
+    "normal_k_lambda": 12000.0,
+    "normal_k_mu": 8000.0,
+    "sample_id": "sample_0001",
+    "split": "val",
+    "split_index": 1
+  },
+  "data_contract": {
+    "definition": "docs/data_contract.md",
+    "template": "docs/metadata_template.json",
+    "version": 2
+  },
+  "files": {
+    "metadata": "sample_0001_gt.json",
+    "npz": "sample_0001.npz",
+    "phantom_3d": null,
+    "press_records": null,
+    "scan_animation": null,
+    "visualization_command": "sample_0001_visualization_command.md"
+  },
+  "label": {
+    "extent": "full_phantom_xy",
+    "mask_key": "mask",
+    "shape": [
+      6,
+      6
+    ],
+    "x_values": [
+      -0.09,
+      -0.054,
+      -0.018000000000000002,
+      0.017999999999999988,
+      0.05399999999999999,
+      0.09
+    ],
+    "xy_key": "label_xy",
+    "y_values": [
+      -0.09,
+      -0.054,
+      -0.018000000000000002,
+      0.017999999999999988,
+      0.05399999999999999,
+      0.09
+    ]
+  },
+  "lumps": [
+    {
+      "bottom_depth_from_top": 0.023204321059190652,
+      "center": [
+        0.0020558922156230647,
+        -0.02896324963166786,
+        0.06422682554366678
+      ],
+      "center_depth_from_top": 0.015773174456333222,
+      "effective_material": {
+        "k_damp": 0.0004183300132670378,
+        "k_lambda": 210000.0,
+        "k_mu": 140000.0
+      },
+      "id": 0,
+      "radii": [
+        0.029589869788887828,
+        0.027852438061803236,
+        0.00743114660285743
+      ],
+      "shape": "cylinder",
+      "stiffness_multiplier": 17.5,
+      "top_depth_from_top": 0.008342027853475792,
+      "xy_bbox_approx": [
+        -0.027533977573264763,
+        -0.05855311942055569,
+        0.03164576200451089,
+        0.0006266201572199676
+      ],
+      "yaw": -1.8340012185168295,
+      "z_extent": 0.00743114660285743,
+      "z_interval": [
+        0.05679567894080935,
+        0.07165797214652421
+      ]
+    },
+    {
+      "bottom_depth_from_top": 0.049762112304844945,
+      "center": [
+        0.0537004948874886,
+        0.057155455359643614,
+        0.03715117663958461
+      ],
+      "center_depth_from_top": 0.04284882336041539,
+      "effective_material": {
+        "k_damp": 0.000223606797749979,
+        "k_lambda": 60000.0,
+        "k_mu": 40000.0
+      },
+      "id": 1,
+      "radii": [
+        0.016522682303433456,
+        0.012722808604565608,
+        0.006913288944429552
+      ],
+      "shape": "cylinder",
+      "stiffness_multiplier": 5.0,
+      "top_depth_from_top": 0.03593553441598584,
+      "xy_bbox_approx": [
+        0.03717781258405514,
+        0.04063277305621016,
+        0.07022317719092205,
+        0.07367813766307707
+      ],
+      "yaw": -1.4003131169862444,
+      "z_extent": 0.006913288944429552,
+      "z_interval": [
+        0.030237887695155057,
+        0.04406446558401416
+      ]
+    },
+    {
+      "bottom_depth_from_top": 0.06637432697614389,
+      "center": [
+        0.047094529710129965,
+        0.02994831188880849,
+        0.02003732735911612
+      ],
+      "center_depth_from_top": 0.05996267264088388,
+      "effective_material": {
+        "k_damp": 0.0003651483716701108,
+        "k_lambda": 160000.0,
+        "k_mu": 106666.66666666667
+      },
+      "id": 2,
+      "radii": [
+        0.01981698163009636,
+        0.01663274965385425,
+        0.006411654335260005
+      ],
+      "shape": "cylinder",
+      "stiffness_multiplier": 13.333333333333334,
+      "top_depth_from_top": 0.05355101830562388,
+      "xy_bbox_approx": [
+        0.027277548080033603,
+        0.010131330258712129,
+        0.06691151134022633,
+        0.04976529351890485
+      ],
+      "yaw": -1.8606483712367885,
+      "z_extent": 0.006411654335260005,
+      "z_interval": [
+        0.013625673023856115,
+        0.026448981694376122
+      ]
+    },
+    {
+      "bottom_depth_from_top": 0.035801811427589,
+      "center": [
+        -0.022268530443564742,
+        0.020049784834329648,
+        0.05038155520393677
+      ],
+      "center_depth_from_top": 0.02961844479606323,
+      "effective_material": {
+        "k_damp": 0.0005477225575051661,
+        "k_lambda": 360000.0,
+        "k_mu": 240000.0
+      },
+      "id": 3,
+      "radii": [
+        0.012731231444794197,
+        0.02216670853722039,
+        0.006183366631525772
+      ],
+      "shape": "cylinder",
+      "stiffness_multiplier": 30.0,
+      "top_depth_from_top": 0.023435078164537458,
+      "xy_bbox_approx": [
+        -0.044435238980785136,
+        -0.002116923702890742,
+        -0.0001018219063443522,
+        0.042216493371550035
+      ],
+      "yaw": -0.5550023108946776,
+      "z_extent": 0.006183366631525772,
+      "z_interval": [
+        0.044198188572411,
+        0.056564921835462544
+      ]
+    }
+  ],
+  "mask": {
+    "coverage_fraction": 0.1388888888888889,
+    "positive_cells": 5,
+    "shape": [
+      6,
+      6
+    ],
+    "total_cells": 36
+  },
+  "material": {
+    "k_damp": 0.0001,
+    "k_lambda": 12000.0,
+    "k_mu": 8000.0,
+    "lump_stiffness_max": 30.0,
+    "lump_stiffness_min": 5.0,
+    "probe_contact_mu": 0.8,
+    "soft_contact_kd": 1e-07,
+    "soft_contact_ke": 2000000.0,
+    "soft_contact_mu": 0.5
+  },
+  "num_lumps": 4,
+  "phantom": {
+    "cells_x": 8,
+    "cells_y": 8,
+    "cells_z": 4,
+    "density": 500.0,
+    "height": 0.08,
+    "particle_radius": 0.004,
+    "size_x": 0.18,
+    "size_y": 0.18
+  },
+  "resource_usage": {
+    "disk_usage": {
+      "file_count": 2,
+      "files": {
+        "tmp/controlled_fixed_depth_smoke_analytic/val/sample_0001.npz": {
+          "allocated_bytes": 16384,
+          "bytes": 13478
+        },
+        "tmp/controlled_fixed_depth_smoke_analytic/val/sample_0001_visualization_command.md": {
+          "allocated_bytes": 4096,
+          "bytes": 171
+        }
+      },
+      "root": null,
+      "roots": [
+        "tmp/controlled_fixed_depth_smoke_analytic/val/sample_0001.npz",
+        "tmp/controlled_fixed_depth_smoke_analytic/val/sample_0001_visualization_command.md"
+      ],
+      "total_allocated_bytes": 20480,
+      "total_bytes": 13649
+    },
+    "elapsed_seconds": 0.051691749948076904,
+    "finished_at_local": "2026-06-29T17:29:22",
+    "gpu_memory": {
+      "after_used_bytes": 463470592,
+      "available": true,
+      "before_used_bytes": 463470592,
+      "device": null,
+      "note": "memory.used is full-device usage reported by nvidia-smi and can include other processes.",
+      "peak_delta_from_start_bytes": 0,
+      "peak_observed_used_bytes": 463470592,
+      "poll_interval_seconds": 0.2,
+      "query_error": null,
+      "query_method": "nvidia-smi memory.used polling",
+      "sample_count": 0,
+      "unit": "bytes"
+    },
+    "started_at_local": "2026-06-29T17:29:22"
+  },
+  "run": {
+    "date_prefix": null,
+    "date_prefix_format": "yyyymmdd-hhmmss",
+    "date_prefixed_directory": null,
+    "directory_name": "val",
+    "output_dir": "tmp/controlled_fixed_depth_smoke_analytic/val"
+  },
+  "runtime": {
+    "device": {
+      "requested": "cuda:0",
+      "required": "cuda:0"
+    },
+    "newton": {
+      "root": "/home/guoheng/newton",
+      "simulator_entrypoint": "palpation_sim.newton_vbd.NewtonVBDPalpationSimulator"
+    },
+    "python": {
+      "conda_default_env": "palpation",
+      "environment_manager": "conda",
+      "environment_name": "palpation",
+      "executable": "/home/guoheng/.conda/envs/palpation/bin/python"
+    }
+  },
+  "sample_id": "sample_0001",
+  "scan": {
+    "edge_margin": 0.015,
+    "grid_h": 6,
+    "grid_w": 6,
+    "indentation_values": [
+      0.0,
+      0.0017142857142857144,
+      0.003428571428571429,
+      0.0051428571428571435,
+      0.006857142857142858,
+      0.008571428571428572,
+      0.010285714285714287,
+      0.012
+    ],
+    "max_indentation": 0.012,
+    "preload_gap": 0.0005,
+    "press_steps": 8,
+    "probe_radius": 0.012,
+    "reset_between_points": true,
+    "sim_dt": 0.0016666666666666668,
+    "sim_substeps_per_depth": 3,
+    "soft_contact_margin": 0.004,
+    "vbd_iterations": 10,
+    "x_values": [
+      -0.075,
+      -0.045,
+      -0.015,
+      0.015,
+      0.045,
+      0.075
+    ],
+    "y_values": [
+      -0.075,
+      -0.045,
+      -0.015,
+      0.015,
+      0.045,
+      0.075
+    ]
+  },
+  "scan_label_compatibility": {
+    "scan_extent": "edge_margin_limited",
+    "scan_mask_key": "scan_mask",
+    "scan_xy_key": "xy"
+  },
+  "schema_name": "palpation_sample_metadata",
+  "schema_version": 3,
+  "split": "val",
+  "units": {
+    "force": "N",
+    "lame_parameters": "Pa",
+    "length": "m",
+    "mass": "kg",
+    "stiffness": "N/m",
+    "time": "s"
+  }
+}

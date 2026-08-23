@@ -1,0 +1,7 @@
+method,split,supports_world_prediction,world_prediction_type,mask_ratio,heldout_latent_mse,heldout_curve_huber,heldout_curve_mse,Fx_mse,Fy_mse,Fz_mse,Mx_mse,My_mse,Mz_mse,sparse_context_ratio,sparse_context_fixed_dice
+r128_wrench_temporal_cnn_world_unet,test_or_val,True,action_conditioned_curve,0.35,,0.2588988019399044,0.7205524431164538,1.3175039459257984,1.2115737482285593,1.792715058893414,0.000710774910756521,0.0006952255837442639,0.00011590125841207802,,
+r128_wrench_temporal_cnn_world_unet,test,True,sparse_context_segmentation,,,,,,,,,,,0.1,0.573909964990756
+r128_wrench_temporal_cnn_world_unet,test,True,sparse_context_segmentation,,,,,,,,,,,0.25,0.7174244046500813
+r128_wrench_temporal_cnn_world_unet,test,True,sparse_context_segmentation,,,,,,,,,,,0.5,0.7635482529448693
+r128_wrench_temporal_cnn_world_unet,test,True,sparse_context_segmentation,,,,,,,,,,,0.75,0.7804871823804074
+r128_wrench_temporal_cnn_world_unet,test,True,sparse_context_segmentation,,,,,,,,,,,0.9,0.7849042801304339

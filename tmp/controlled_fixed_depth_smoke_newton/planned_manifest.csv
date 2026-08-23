@@ -1,0 +1,2 @@
+split,split_index,global_index,sample_id,normal_k_mu,normal_k_lambda,lump_count,lump_stiffness_multipliers,geometry_seed
+train,0,0,sample_0000,8000.0,8000.0,4,"[13.333333333333334, 5.0, 30.0, 21.666666666666668]",2126655680

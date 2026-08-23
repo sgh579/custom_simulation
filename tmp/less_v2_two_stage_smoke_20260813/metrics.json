@@ -1,0 +1,202 @@
+{
+  "best_epoch": 1,
+  "best_epochs": {
+    "stage1_representation": 1,
+    "stage2_decoder_2d": 1,
+    "stage2_decoder_3d": 1
+  },
+  "completed_epochs": {
+    "stage1_representation": 1,
+    "stage2_decoder_2d": 1,
+    "stage2_decoder_3d": 1
+  },
+  "elapsed_seconds": 1.742461730958894,
+  "metrics": {
+    "test": {
+      "fixed_0.5": {
+        "2d": {
+          "dice_mean": 0.16070108753035584,
+          "dice_micro": 0.16303099885189437,
+          "dice_std": 0.06546299229226059,
+          "iou_mean": 0.08875,
+          "iou_micro": 0.08875,
+          "iou_std": 0.03875,
+          "predicted_positive_fraction": 1.0,
+          "target_positive_fraction": 0.08875,
+          "threshold": 0.5
+        },
+        "3d": {
+          "dice_mean": 0.028122133688580422,
+          "dice_micro": 0.028194428780872898,
+          "dice_std": 0.010865094633176245,
+          "iou_mean": 0.014292394445695966,
+          "iou_micro": 0.014298787462823153,
+          "iou_std": 0.005588775572585569,
+          "predicted_positive_fraction": 0.679296875,
+          "target_positive_fraction": 0.0134375,
+          "threshold": 0.5
+        }
+      },
+      "val_selected_threshold": {
+        "2d": {
+          "dice_mean": 0.16070108753035584,
+          "dice_micro": 0.16303099885189437,
+          "dice_std": 0.06546299229226059,
+          "iou_mean": 0.08875,
+          "iou_micro": 0.08875,
+          "iou_std": 0.03875,
+          "predicted_positive_fraction": 1.0,
+          "target_positive_fraction": 0.08875,
+          "threshold": 0.1
+        },
+        "3d": {
+          "dice_mean": 0.031019773054449994,
+          "dice_micro": 0.031121399176954733,
+          "dice_std": 0.012347573884325514,
+          "iou_mean": 0.015794180085599022,
+          "iou_micro": 0.01580666231221424,
+          "iou_std": 0.0063700963159655155,
+          "predicted_positive_fraction": 0.5940625,
+          "target_positive_fraction": 0.0134375,
+          "threshold": 0.775
+        }
+      }
+    },
+    "train": {
+      "fixed_0.5": {
+        "2d": {
+          "dice_mean": 0.1326898830485631,
+          "dice_micro": 0.13736903376018628,
+          "dice_std": 0.0934741967740533,
+          "iou_mean": 0.07375,
+          "iou_micro": 0.07375,
+          "iou_std": 0.05375,
+          "predicted_positive_fraction": 1.0,
+          "target_positive_fraction": 0.07375,
+          "threshold": 0.5
+        },
+        "3d": {
+          "dice_mean": 0.02714616146249143,
+          "dice_micro": 0.0273972602739726,
+          "dice_std": 0.020728558895450402,
+          "iou_mean": 0.013871770322219281,
+          "iou_micro": 0.013888888888888888,
+          "iou_std": 0.010652639487544642,
+          "predicted_positive_fraction": 0.67921875,
+          "target_positive_fraction": 0.010859375,
+          "threshold": 0.5
+        }
+      },
+      "val_selected_threshold": {
+        "2d": {
+          "dice_mean": 0.1326898830485631,
+          "dice_micro": 0.13736903376018628,
+          "dice_std": 0.0934741967740533,
+          "iou_mean": 0.07375,
+          "iou_micro": 0.07375,
+          "iou_std": 0.05375,
+          "predicted_positive_fraction": 1.0,
+          "target_positive_fraction": 0.07375,
+          "threshold": 0.1
+        },
+        "3d": {
+          "dice_mean": 0.03087253667607118,
+          "dice_micro": 0.03122177783511805,
+          "dice_std": 0.023538854119758975,
+          "iou_mean": 0.01582344059105253,
+          "iou_micro": 0.01585845347313237,
+          "iou_std": 0.012143104103145065,
+          "predicted_positive_fraction": 0.5946875,
+          "target_positive_fraction": 0.010859375,
+          "threshold": 0.775
+        }
+      }
+    },
+    "val": {
+      "fixed_0.5": {
+        "2d": {
+          "dice_mean": 0.09036076021395242,
+          "dice_micro": 0.09296781883194279,
+          "dice_std": 0.07055878001593262,
+          "iou_mean": 0.048749999999999995,
+          "iou_micro": 0.04875,
+          "iou_std": 0.03875,
+          "predicted_positive_fraction": 1.0,
+          "target_positive_fraction": 0.04875,
+          "threshold": 0.5
+        },
+        "3d": {
+          "dice_mean": 0.04599728444033041,
+          "dice_micro": 0.047035220686580476,
+          "dice_std": 0.039127579837628323,
+          "iou_mean": 0.023950608006017105,
+          "iou_micro": 0.024084008674808813,
+          "iou_std": 0.020503916829546515,
+          "predicted_positive_fraction": 0.678984375,
+          "target_positive_fraction": 0.021953125,
+          "threshold": 0.5
+        }
+      },
+      "val_selected_threshold": {
+        "2d": {
+          "dice_mean": 0.09036076021395242,
+          "dice_micro": 0.09296781883194279,
+          "dice_std": 0.07055878001593262,
+          "iou_mean": 0.048749999999999995,
+          "iou_micro": 0.04875,
+          "iou_std": 0.03875,
+          "predicted_positive_fraction": 1.0,
+          "target_positive_fraction": 0.04875,
+          "threshold": 0.1
+        },
+        "3d": {
+          "dice_mean": 0.04931726830394061,
+          "dice_micro": 0.05061369100341642,
+          "dice_std": 0.04148027770832933,
+          "iou_mean": 0.025745875461905793,
+          "iou_micro": 0.02596391016487083,
+          "iou_std": 0.021811965155060786,
+          "predicted_positive_fraction": 0.59546875,
+          "target_positive_fraction": 0.021953125,
+          "threshold": 0.775
+        }
+      }
+    }
+  },
+  "protocol": "two-stage LESS port: self-supervised local force reconstruction, then frozen task decoders",
+  "representation_frozen_for_stage2": true,
+  "representation_sha256_used_by_both_decoders": "dd35e870450ec3aca60187ea53abcfca9589284c87fb608a468a53332492e1e0",
+  "stage1": {
+    "best_epoch": 1,
+    "best_val_force_reconstruction_mse": 0.925651123046875,
+    "elapsed_seconds": 0.4519509528763592,
+    "final_train_force_reconstruction_mse": 0.995961669921875,
+    "initial_train_force_reconstruction_mse": 0.995961669921875,
+    "parameter_count": 214696,
+    "relative_train_loss_drop": 0.0
+  },
+  "stage2_2d": {
+    "best_epoch": 1,
+    "best_val_loss": 5.489591121673584,
+    "elapsed_seconds": 0.3651095738168806,
+    "final_train_loss": 2.49055814743042,
+    "frozen_representation_sha256": "dd35e870450ec3aca60187ea53abcfca9589284c87fb608a468a53332492e1e0",
+    "initial_train_loss": 2.49055814743042,
+    "parameter_count": 64129,
+    "relative_train_loss_drop": 0.0
+  },
+  "stage2_3d": {
+    "best_epoch": 1,
+    "best_val_loss": 4.017178058624268,
+    "elapsed_seconds": 0.19442161009646952,
+    "final_train_loss": 0.9389840364456177,
+    "frozen_representation_sha256": "dd35e870450ec3aca60187ea53abcfca9589284c87fb608a468a53332492e1e0",
+    "initial_train_loss": 0.9389840364456177,
+    "parameter_count": 232257,
+    "relative_train_loss_drop": 0.0
+  },
+  "thresholds_selected_on_validation": {
+    "2d": 0.1,
+    "3d": 0.775
+  }
+}

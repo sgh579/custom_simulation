@@ -1,0 +1,34 @@
+task,method,value,note,source
+full_context_2d,temporal_cnn32_unet,0.769447,baseline,/home/guoheng/custom_simulation/runs/nonlinear_trajectory_20x_repeats10_seed20260618/highres_wrench_temporal_variants/leaderboard_with_baselines.csv
+full_context_2d,r128_cnn32_plus_temporal_cnn_world_unet_fusion,0.787268,delta_vs_temporal_cnn32=+0.017820 alpha_world=0.55,/home/guoheng/custom_simulation/runs/wrench_world_fusion_20260622/leaderboard.csv
+full_context_2d,r128_cnn32_plus_temporal_cnn_world_curve_unet_fusion,0.774143,delta_vs_temporal_cnn32=+0.004696 alpha_world=0.5,/home/guoheng/custom_simulation/runs/wrench_world_fusion_20260622/leaderboard.csv
+sparse_context_2d,r128_wrench_temporal_cnn_world_curve_unet@0.25,0.664635,fixed_threshold=0.5,/home/guoheng/custom_simulation/runs/wrench_temporal_cnn_world_20260622/world_model_metrics.csv
+sparse_context_2d,r128_wrench_temporal_cnn_world_curve_unet@0.5,0.733619,fixed_threshold=0.5,/home/guoheng/custom_simulation/runs/wrench_temporal_cnn_world_20260622/world_model_metrics.csv
+sparse_context_2d,r128_wrench_temporal_cnn_world_curve_unet@0.75,0.745727,fixed_threshold=0.5,/home/guoheng/custom_simulation/runs/wrench_temporal_cnn_world_20260622/world_model_metrics.csv
+sparse_context_2d,r128_wrench_temporal_cnn_world_unet@0.25,0.653095,fixed_threshold=0.5,/home/guoheng/custom_simulation/runs/wrench_temporal_cnn_world_20260622/world_model_metrics.csv
+sparse_context_2d,r128_wrench_temporal_cnn_world_unet@0.5,0.736903,fixed_threshold=0.5,/home/guoheng/custom_simulation/runs/wrench_temporal_cnn_world_20260622/world_model_metrics.csv
+sparse_context_2d,r128_wrench_temporal_cnn_world_unet@0.75,0.754124,fixed_threshold=0.5,/home/guoheng/custom_simulation/runs/wrench_temporal_cnn_world_20260622/world_model_metrics.csv
+sparse_context_2d,r128_wrench_temporal_cnn_sparse_unet@0.1,0.555118,fixed_threshold=0.5,/home/guoheng/custom_simulation/WM/runs/sparse_baseline_core_20260701/world_model_metrics.csv
+sparse_context_2d,r128_wrench_temporal_cnn_sparse_unet@0.25,0.648360,fixed_threshold=0.5,/home/guoheng/custom_simulation/WM/runs/sparse_baseline_core_20260701/world_model_metrics.csv
+sparse_context_2d,r128_wrench_temporal_cnn_sparse_unet@0.5,0.683289,fixed_threshold=0.5,/home/guoheng/custom_simulation/WM/runs/sparse_baseline_core_20260701/world_model_metrics.csv
+sparse_context_2d,r128_wrench_temporal_cnn_sparse_unet@0.75,0.694862,fixed_threshold=0.5,/home/guoheng/custom_simulation/WM/runs/sparse_baseline_core_20260701/world_model_metrics.csv
+sparse_context_delta,r128_wrench_temporal_cnn_world_curve_unet@0.25 vs sparse_unet,0.016276,world=0.664635 baseline=0.648360,computed
+sparse_context_delta,r128_wrench_temporal_cnn_world_unet@0.25 vs sparse_unet,0.004735,world=0.653095 baseline=0.648360,computed
+sparse_context_delta,r128_wrench_temporal_cnn_world_curve_unet@0.5 vs sparse_unet,0.050330,world=0.733619 baseline=0.683289,computed
+sparse_context_delta,r128_wrench_temporal_cnn_world_unet@0.5 vs sparse_unet,0.053615,world=0.736903 baseline=0.683289,computed
+sparse_context_delta,r128_wrench_temporal_cnn_world_curve_unet@0.75 vs sparse_unet,0.050865,world=0.745727 baseline=0.694862,computed
+sparse_context_delta,r128_wrench_temporal_cnn_world_unet@0.75 vs sparse_unet,0.059262,world=0.754124 baseline=0.694862,computed
+sparse_context_repeated_ci,world_curve_unet@0.25 vs sparse_unet,0.013014,"sample_mean_delta=0.009708 sample_bootstrap_95ci=[0.004467,0.015141] seeds=5",/home/guoheng/custom_simulation/WM/reports/sparse_context_repeats/sparse_context_delta_ci.csv
+sparse_context_repeated_ci,world_unet@0.25 vs sparse_unet,0.007407,"sample_mean_delta=-0.002126 sample_bootstrap_95ci=[-0.007966,0.003852] seeds=5",/home/guoheng/custom_simulation/WM/reports/sparse_context_repeats/sparse_context_delta_ci.csv
+sparse_context_repeated_ci,world_curve_unet@0.5 vs sparse_unet,0.048515,"sample_mean_delta=0.051042 sample_bootstrap_95ci=[0.046947,0.055014] seeds=5",/home/guoheng/custom_simulation/WM/reports/sparse_context_repeats/sparse_context_delta_ci.csv
+sparse_context_repeated_ci,world_unet@0.5 vs sparse_unet,0.053092,"sample_mean_delta=0.042152 sample_bootstrap_95ci=[0.037141,0.047355] seeds=5",/home/guoheng/custom_simulation/WM/reports/sparse_context_repeats/sparse_context_delta_ci.csv
+sparse_context_repeated_ci,world_curve_unet@0.75 vs sparse_unet,0.050285,"sample_mean_delta=0.052940 sample_bootstrap_95ci=[0.049036,0.056817] seeds=5",/home/guoheng/custom_simulation/WM/reports/sparse_context_repeats/sparse_context_delta_ci.csv
+sparse_context_repeated_ci,world_unet@0.75 vs sparse_unet,0.061658,"sample_mean_delta=0.053129 sample_bootstrap_95ci=[0.048387,0.057982] seeds=5",/home/guoheng/custom_simulation/WM/reports/sparse_context_repeats/sparse_context_delta_ci.csv
+3d_to_2d_projection,v32x64x64_wrench_temporal_cnn_volume,0.746898,projection Dice from predicted volume,/home/guoheng/custom_simulation/runs/wrench_3d_volume_depth_aware_train_20260622/leaderboard.csv
+3d_to_2d_projection,v32x64x64_wrench_temporal_cnn_world_curve_volume,0.719163,projection Dice from predicted volume,/home/guoheng/custom_simulation/runs/wrench_3d_volume_depth_aware_train_20260622/leaderboard.csv
+3d_to_2d_projection,v32x64x64_wrench_temporal_cnn_world_volume,0.718376,projection Dice from predicted volume,/home/guoheng/custom_simulation/runs/wrench_3d_volume_depth_aware_train_20260622/leaderboard.csv
+3d_to_2d_projection,v32x64x64_supervised_plus_world_volume_depthaware_fusion,0.751659,projection Dice from predicted volume,/home/guoheng/custom_simulation/runs/wrench_3d_volume_depth_aware_fusion_20260622/leaderboard.csv
+3d_to_2d_projection,v32x64x64_supervised_plus_world_curve_depthaware_fusion,0.758536,projection Dice from predicted volume,/home/guoheng/custom_simulation/runs/wrench_3d_volume_depth_aware_fusion_20260622/leaderboard.csv
+jepa_visreg_2d,r128_wrench_lejepa_vit_unet_m50,0.733767,heldout_latent_mse=0.0753520369529724,/home/guoheng/custom_simulation/WM/runs/jepa_visreg_core_20260701/leaderboard.csv
+jepa_visreg_2d,r128_wrench_visreg_vit_unet_m50,0.726168,heldout_latent_mse=0.07586548075079919,/home/guoheng/custom_simulation/WM/runs/jepa_visreg_core_20260701/leaderboard.csv
+jepa_visreg_2d,r128_wrench_jepa_vit_unet_m50,0.722743,heldout_latent_mse=0.0069145749555900695,/home/guoheng/custom_simulation/WM/runs/jepa_visreg_core_20260701/leaderboard.csv

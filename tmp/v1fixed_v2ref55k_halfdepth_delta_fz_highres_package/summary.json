@@ -1,0 +1,1 @@
+{"description":"Combined V1 fixed_depth and V2 ref55k package. Training uses delta_fz first 20 depth steps.","v1":"data/palpation_synthetic_depth_modes_1000train_400val_400test_20260622/fixed_depth/data","v2":"data/V2","splits":{"train":{"v1":1000,"v2":2000},"val":{"v1":400,"v2":800},"test":{"v1":400,"v2":800}}}

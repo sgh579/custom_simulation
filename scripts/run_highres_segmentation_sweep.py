@@ -39,6 +39,7 @@ from run_segmentation_accuracy_sweep import (
     metrics_from_counts,
     normalize_maps,
     predict_neural,
+    preload_subtract_fz,
     train_neural_method,
     write_score_method,
 )
@@ -47,11 +48,12 @@ from run_segmentation_accuracy_sweep import (
 DEFAULT_PACKAGE_DIR = Path("runs/dataset_packages/palpation_random_shapes_20x_800train_80val_80test_20260616")
 DEFAULT_OUT_DIR = Path("runs/highres_segmentation_sweep_128_800_80_80")
 DEFAULT_RESOLUTIONS = (128,)
-DEFAULT_INPUTS = ("stiffness", "fz")
+DEFAULT_INPUTS = ("stiffness", "delta_fz")
 ALLOWED_INPUTS = (
     "stiffness",
     "stiffness_random_pair",
     "fz",
+    "delta_fz",
     "fz_limited_resampled",
     "press_limited_resampled",
     "fz_limited_sincos",
@@ -71,6 +73,10 @@ LIMITED_TRAJECTORY_POLICY = (
     "Limited-trajectory raw-curve inputs choose one reproducible random endpoint from index 1..T-1 "
     "per scan point, then linearly resample the prefix 0..endpoint to the requested input length. "
     "Displacement and Fz are resampled on the same fractional source positions."
+)
+DELTA_FZ_INPUT_POLICY = (
+    "delta_fz subtracts each scan point's first Fz sample before dataset normalization, preserving absolute "
+    "incremental force magnitude while removing additive preload offsets."
 )
 MODEL_RESIZE_POLICY = (
     "When a model emits logits at a different spatial size from the requested target, UpsampleLogits "
@@ -137,7 +143,7 @@ def main() -> None:
         "--inputs",
         type=str,
         default=",".join(DEFAULT_INPUTS),
-        help="Comma list: stiffness,stiffness_random_pair,fz,fz_limited_resampled,press_limited_resampled,fz_limited_sincos",
+        help="Comma list: stiffness,stiffness_random_pair,fz,delta_fz,fz_limited_resampled,press_limited_resampled,fz_limited_sincos",
     )
     parser.add_argument("--models", type=str, default=",".join(DEFAULT_MODELS), help="Comma list: unet,mlp,shallow_cnn,kmeans")
     parser.add_argument("--force", action="store_true")
@@ -145,6 +151,18 @@ def main() -> None:
     parser.add_argument("--stiffness-random-seed", type=int, default=None)
     parser.add_argument("--limited-trajectory-seed", type=int, default=None)
     parser.add_argument("--trajectory-input-steps", type=int, default=0, help="0 keeps the native number of trajectory samples.")
+    parser.add_argument(
+        "--load-depth-steps",
+        type=int,
+        default=0,
+        help="0 keeps each sample's native depth length; a positive value truncates fz/z while loading.",
+    )
+    parser.add_argument(
+        "--delta-fz-depth-steps",
+        type=int,
+        default=0,
+        help="0 keeps all delta-Fz depth channels; a positive value keeps only the first N channels before normalization.",
+    )
     parser.add_argument("--positional-embedding-dim", type=int, default=8, help="Even sinusoidal displacement embedding dimension.")
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument("--epochs", type=int, default=50)
@@ -197,6 +215,9 @@ def main() -> None:
         "stiffness_random_pair_policy": STIFFNESS_RANDOM_PAIR_POLICY,
         "stiffness_random_seed": stiffness_random_seed,
         "limited_trajectory_policy": LIMITED_TRAJECTORY_POLICY,
+        "delta_fz_input_policy": DELTA_FZ_INPUT_POLICY,
+        "load_depth_steps": int(args.load_depth_steps),
+        "delta_fz_depth_steps": int(args.delta_fz_depth_steps),
         "limited_trajectory_seed": limited_trajectory_seed,
         "trajectory_input_steps": int(args.trajectory_input_steps),
         "positional_embedding_dim": int(args.positional_embedding_dim),
@@ -210,13 +231,31 @@ def main() -> None:
         max_train = 8 if args.smoke else None
         max_eval = 4 if args.smoke else None
         print(f"loading r{resolution} train split: {train_dir}")
-        train = load_split(train_dir, label_size=resolution, max_samples=max_train, random_pair_seed=stiffness_random_seed)
+        train = load_split(
+            train_dir,
+            label_size=resolution,
+            max_samples=max_train,
+            random_pair_seed=stiffness_random_seed,
+            depth_steps=int(args.load_depth_steps),
+        )
         print(f"loading r{resolution} val split: {val_dir}")
-        val = load_split(val_dir, label_size=resolution, max_samples=max_eval, random_pair_seed=stiffness_random_seed)
+        val = load_split(
+            val_dir,
+            label_size=resolution,
+            max_samples=max_eval,
+            random_pair_seed=stiffness_random_seed,
+            depth_steps=int(args.load_depth_steps),
+        )
         test = None
         if not args.no_test:
             print(f"loading r{resolution} test split: {test_dir}")
-            test = load_split(test_dir, label_size=resolution, max_samples=max_eval, random_pair_seed=stiffness_random_seed)
+            test = load_split(
+                test_dir,
+                label_size=resolution,
+                max_samples=max_eval,
+                random_pair_seed=stiffness_random_seed,
+                depth_steps=int(args.load_depth_steps),
+            )
 
         x_by_input = build_inputs(train, val, test, args, limited_trajectory_seed=limited_trajectory_seed)
         for input_name in inputs:
@@ -236,6 +275,18 @@ def main() -> None:
                     "target_shape_hw": [int(resolution), int(resolution)],
                     "feature_names": FEATURE_NAMES,
                     "stiffness_input_shape_hw": list(train.features.shape[-2:]),
+                    "input_normalization": input_normalization_contract(
+                        input_name,
+                        train,
+                        args,
+                        source_train_dir=train_dir,
+                    ),
+                    "binary_output_contract": {
+                        "model_output": "one occupancy logit per output voxel/pixel",
+                        "training_probability_link": "sigmoid inside BCEWithLogits and Dice loss",
+                        "inference_probability_link": "sigmoid",
+                        "softmax_applicable": False,
+                    },
                 }
                 if model_name == "kmeans":
                     run_kmeans_method(
@@ -282,6 +333,7 @@ def load_split(
     label_size: int,
     max_samples: int | None = None,
     random_pair_seed: int = 7,
+    depth_steps: int = 0,
 ) -> SplitData:
     files = sorted(split_dir.glob("*.npz"))
     if max_samples is not None:
@@ -299,6 +351,8 @@ def load_split(
         with np.load(path, allow_pickle=False) as sample:
             fz_hwt = _load_fz_hwt(sample)
             z_hwt = _load_displacement_hwt(sample, fz_hwt.shape)
+            fz_hwt = limit_hwt_depth_steps(fz_hwt, depth_steps, name=f"{path}: fz")
+            z_hwt = limit_hwt_depth_steps(z_hwt, depth_steps, name=f"{path}: displacement")
             nonlinearity = _load_nonlinearity_map(sample, fz_hwt.shape[:2])
         features = extract_mechanical_features(z_hwt, fz_hwt, nonlinearity)
         sample_seed = stable_sample_seed(random_pair_seed, split_dir.name, path.name)
@@ -321,6 +375,16 @@ def load_split(
         features=np.stack(feature_list).astype(np.float32),
         random_pair_stiffness=np.stack(random_pair_stiffness_list).astype(np.float32),
     )
+
+
+def limit_hwt_depth_steps(x: np.ndarray, steps: int, *, name: str) -> np.ndarray:
+    if int(steps) <= 0:
+        return x
+    if x.ndim != 3:
+        raise ValueError(f"{name}: expected [H,W,T], got {x.shape}")
+    if int(steps) > x.shape[-1]:
+        raise ValueError(f"{name}: requested first {int(steps)} depth steps but input has only {x.shape[-1]}")
+    return x[..., : int(steps)].astype(np.float32, copy=False)
 
 
 def stable_sample_seed(base_seed: int, split_name: str, sample_name: str) -> int:
@@ -399,6 +463,16 @@ def build_inputs(
         mode=args.stiffness_normalize,
     )
     fz_train, fz_val, fz_test = normalize_train_val_test(train.fz, val.fz, test.fz if test is not None else None, mode=args.fz_normalize)
+    delta_fz_steps = int(args.delta_fz_depth_steps)
+    train_delta_source = limit_depth_channels(train.fz, delta_fz_steps, name="train delta_fz")
+    val_delta_source = limit_depth_channels(val.fz, delta_fz_steps, name="val delta_fz")
+    test_delta_source = limit_depth_channels(test.fz, delta_fz_steps, name="test delta_fz") if test is not None else None
+    delta_fz_train, delta_fz_val, delta_fz_test = normalize_train_val_test(
+        preload_subtract_fz(train_delta_source),
+        preload_subtract_fz(val_delta_source),
+        preload_subtract_fz(test_delta_source) if test_delta_source is not None else None,
+        mode=args.fz_normalize,
+    )
     input_steps = int(args.trajectory_input_steps) if int(args.trajectory_input_steps) > 0 else int(train.fz.shape[1])
     limited_train_fz, limited_train_press = limited_trajectory_inputs(train, split_name="train", input_steps=input_steps, seed=limited_trajectory_seed)
     limited_val_fz, limited_val_press = limited_trajectory_inputs(val, split_name="val", input_steps=input_steps, seed=limited_trajectory_seed)
@@ -456,6 +530,7 @@ def build_inputs(
         "stiffness": (stiffness_train, stiffness_val, stiffness_test),
         "stiffness_random_pair": (random_pair_train, random_pair_val, random_pair_test),
         "fz": (fz_train, fz_val, fz_test),
+        "delta_fz": (delta_fz_train, delta_fz_val, delta_fz_test),
         "fz_limited_resampled": (limited_fz_train, limited_fz_val, limited_fz_test),
         "press_limited_resampled": (limited_press_train, limited_press_val, limited_press_test),
         "fz_limited_sincos": (limited_sincos_train, limited_sincos_val, limited_sincos_test),
@@ -606,6 +681,92 @@ def normalize_train_val_test(
     else:
         raise ValueError(f"Unknown normalize mode: {mode}")
     return train_norm, val_norm, test_norm
+
+
+def input_normalization_contract(
+    input_name: str,
+    train: SplitData,
+    args: argparse.Namespace,
+    *,
+    source_train_dir: Path,
+) -> dict[str, Any]:
+    """Return the exact source-train normalization needed for checkpoint transfer.
+
+    The historical high-resolution checkpoints recorded only the normalization
+    mode.  That made a generic transfer evaluator liable to refit statistics on
+    the target domain.  Dataset-normalized inputs now persist their source
+    channel means and standard deviations directly in the checkpoint context.
+    """
+
+    if input_name == "fz":
+        source = train.fz
+        mode = str(args.fz_normalize)
+        preprocessing = "raw_fz"
+    elif input_name == "delta_fz":
+        source = preload_subtract_fz(
+            limit_depth_channels(
+                train.fz,
+                int(args.delta_fz_depth_steps),
+                name="train delta_fz normalization contract",
+            )
+        )
+        mode = str(args.fz_normalize)
+        preprocessing = "fz_minus_first_depth_sample"
+    elif input_name == "stiffness":
+        source = train.features[:, FEATURE_NAMES.index("equivalent_stiffness")][:, None]
+        mode = str(args.stiffness_normalize)
+        preprocessing = "equivalent_stiffness"
+    elif input_name == "stiffness_random_pair":
+        source = train.random_pair_stiffness[:, None]
+        mode = str(args.stiffness_normalize)
+        preprocessing = "random_pair_equivalent_stiffness"
+    else:
+        return {
+            "schema_version": 1,
+            "mode": str(args.fz_normalize),
+            "preprocessing": input_name,
+            "source_train_dir": str(source_train_dir),
+            "transfer_support": "not_yet_serialized_for_this_composite_input",
+        }
+
+    contract: dict[str, Any] = {
+        "schema_version": 1,
+        "mode": mode,
+        "preprocessing": preprocessing,
+        "source_train_dir": str(source_train_dir),
+        "channel_axis": 1,
+        "spatial_axes": [0, 2, 3],
+        "epsilon": 1e-6,
+    }
+    if mode == "dataset":
+        value = np.asarray(source, dtype=np.float32)
+        mean = np.nanmean(value, axis=(0, 2, 3), keepdims=True).astype(np.float32)
+        std = np.nanstd(value, axis=(0, 2, 3), keepdims=True).astype(np.float32)
+        contract.update(
+            {
+                "mean": mean.reshape(-1).tolist(),
+                "std": std.reshape(-1).tolist(),
+                "channels": int(value.shape[1]),
+                "application": "(x - source_train_mean) / (source_train_std + epsilon)",
+            }
+        )
+    elif mode == "sample":
+        contract["application"] = "per_sample_per_channel_spatial_mean_std"
+    elif mode == "none":
+        contract["application"] = "identity_except_nan_to_num"
+    else:
+        raise ValueError(f"Unknown normalize mode: {mode}")
+    return contract
+
+
+def limit_depth_channels(x: np.ndarray, steps: int, *, name: str) -> np.ndarray:
+    if int(steps) <= 0:
+        return x
+    if x.ndim < 2:
+        raise ValueError(f"{name}: expected at least sample and depth/channel axes, got {x.shape}")
+    if int(steps) > x.shape[1]:
+        raise ValueError(f"{name}: requested first {int(steps)} depth channels but input has only {x.shape[1]}")
+    return x[:, : int(steps)].astype(np.float32, copy=False)
 
 
 def build_model(

@@ -1,0 +1,221 @@
+{
+  "args": {
+    "allow_empty_scan_mask": false,
+    "allow_lump_overlap": false,
+    "allow_z_overlap": false,
+    "backend": "analytic",
+    "cells_x": 8,
+    "cells_y": 8,
+    "cells_z": 4,
+    "device": "cuda:0",
+    "edge_margin": 0.015,
+    "grid_h": 6,
+    "grid_w": 6,
+    "height": 0.08,
+    "lump_shapes": "sphere,ellipsoid,box,cylinder,capsule",
+    "lump_size_scale": 1.0,
+    "lump_stiffness_max": 30.0,
+    "lump_stiffness_min": 5.0,
+    "max_center_depth": null,
+    "max_indentation": 0.012,
+    "max_lump_radius_fraction": 0.2,
+    "max_samples": 7,
+    "min_center_depth": null,
+    "newton_root": "/home/guoheng/newton",
+    "no_save_phantom_3d": true,
+    "no_save_press_records": true,
+    "no_save_scan_animation": true,
+    "normal_k_lambda_max": 12000.0,
+    "normal_k_lambda_min": 8000.0,
+    "normal_k_mu_max": 12000.0,
+    "normal_k_mu_min": 8000.0,
+    "num_test": 2,
+    "num_train": 3,
+    "num_val": 2,
+    "out_dir": "tmp/controlled_fixed_depth_smoke_analytic",
+    "particle_radius": 0.004,
+    "press_steps": 8,
+    "probe_radius": 0.012,
+    "replace_manifest": false,
+    "resume": true,
+    "save_features": false,
+    "seed": 20260629,
+    "size_x": 0.18,
+    "size_y": 0.18,
+    "substeps_per_depth": 3,
+    "vbd_iterations": 10,
+    "worker_count": 1,
+    "worker_index": 0,
+    "z_gap": 0.0
+  },
+  "backend": "analytic",
+  "controlled_schedule": {
+    "lump_instance_count": 18,
+    "lump_stiffness_ratio": {
+      "distribution": "linear coverage over lump instances per split with deterministic permutation",
+      "max": 30.0,
+      "min": 5.0
+    },
+    "normal_stiffness": {
+      "distribution": "linear coverage per split with deterministic permutation",
+      "k_lambda_max": 12000.0,
+      "k_lambda_min": 8000.0,
+      "k_mu_max": 12000.0,
+      "k_mu_min": 8000.0
+    },
+    "sample_count": 7
+  },
+  "data_contract": {
+    "definition": "docs/data_contract.md",
+    "template": "docs/metadata_template.json",
+    "version": 2
+  },
+  "dataset_id": "controlled_fixed_depth_smoke_analytic",
+  "files": {
+    "metadata": "metadata.json",
+    "sample_metadata_pattern": "{split}/sample_{index:04d}_gt.json",
+    "sample_npz_pattern": "{split}/sample_{index:04d}.npz",
+    "sample_phantom_3d_pattern": "{split}/sample_{index:04d}_phantom.gltf",
+    "sample_press_records_pattern": "{split}/sample_{index:04d}_press_records/",
+    "sample_visualization_command_pattern": "{split}/sample_{index:04d}_visualization_command.md"
+  },
+  "label": {
+    "bugfix": "GT spans the complete phantom XY plane, not the edge-margin-limited scan region.",
+    "extent": "full_phantom_xy",
+    "mask_key": "mask",
+    "shape": [
+      6,
+      6
+    ],
+    "x_values": [
+      -0.09,
+      -0.054,
+      -0.018000000000000002,
+      0.017999999999999988,
+      0.05399999999999999,
+      0.09
+    ],
+    "xy_key": "label_xy",
+    "y_values": [
+      -0.09,
+      -0.054,
+      -0.018000000000000002,
+      0.017999999999999988,
+      0.05399999999999999,
+      0.09
+    ]
+  },
+  "material": {
+    "k_damp": 0.0001,
+    "k_lambda": 10000.0,
+    "k_mu": 10000.0,
+    "lump_stiffness_max": 30.0,
+    "lump_stiffness_min": 5.0,
+    "probe_contact_mu": 0.8,
+    "soft_contact_kd": 1e-07,
+    "soft_contact_ke": 2000000.0,
+    "soft_contact_mu": 0.5
+  },
+  "phantom": {
+    "cells_x": 8,
+    "cells_y": 8,
+    "cells_z": 4,
+    "density": 500.0,
+    "height": 0.08,
+    "particle_radius": 0.004,
+    "size_x": 0.18,
+    "size_y": 0.18
+  },
+  "run": {
+    "date_prefix": null,
+    "date_prefix_format": "yyyymmdd-hhmmss",
+    "date_prefixed_directory": null,
+    "directory_name": "controlled_fixed_depth_smoke_analytic",
+    "output_dir": "tmp/controlled_fixed_depth_smoke_analytic"
+  },
+  "runtime": {
+    "device": {
+      "requested": "cuda:0",
+      "required": "cuda:0"
+    },
+    "newton": {
+      "root": "/home/guoheng/newton",
+      "simulator_entrypoint": "palpation_sim.newton_vbd.NewtonVBDPalpationSimulator"
+    },
+    "python": {
+      "conda_default_env": "palpation",
+      "environment_manager": "conda",
+      "environment_name": "palpation",
+      "executable": "/home/guoheng/.conda/envs/palpation/bin/python"
+    }
+  },
+  "scan": {
+    "edge_margin": 0.015,
+    "grid_h": 6,
+    "grid_w": 6,
+    "indentation_values": [
+      0.0,
+      0.0017142857142857144,
+      0.003428571428571429,
+      0.0051428571428571435,
+      0.006857142857142858,
+      0.008571428571428572,
+      0.010285714285714287,
+      0.012
+    ],
+    "max_indentation": 0.012,
+    "preload_gap": 0.0005,
+    "press_steps": 8,
+    "probe_radius": 0.012,
+    "reset_between_points": true,
+    "sim_dt": 0.0016666666666666668,
+    "sim_substeps_per_depth": 3,
+    "soft_contact_margin": 0.004,
+    "vbd_iterations": 10,
+    "x_values": [
+      -0.075,
+      -0.045,
+      -0.015,
+      0.015,
+      0.045,
+      0.075
+    ],
+    "y_values": [
+      -0.075,
+      -0.045,
+      -0.015,
+      0.015,
+      0.045,
+      0.075
+    ]
+  },
+  "schema_name": "palpation_dataset_metadata",
+  "schema_version": 2,
+  "seed": 20260629,
+  "splits": {
+    "test": {
+      "count": 2,
+      "sample_metadata_pattern": "test/sample_{index:04d}_gt.json",
+      "sample_npz_pattern": "test/sample_{index:04d}.npz",
+      "sample_phantom_3d_pattern": "test/sample_{index:04d}_phantom.gltf",
+      "sample_press_records_pattern": "test/sample_{index:04d}_press_records/",
+      "sample_visualization_command_pattern": "test/sample_{index:04d}_visualization_command.md"
+    },
+    "train": {
+      "count": 3,
+      "sample_metadata_pattern": "train/sample_{index:04d}_gt.json",
+      "sample_npz_pattern": "train/sample_{index:04d}.npz",
+      "sample_phantom_3d_pattern": "train/sample_{index:04d}_phantom.gltf",
+      "sample_press_records_pattern": "train/sample_{index:04d}_press_records/",
+      "sample_visualization_command_pattern": "train/sample_{index:04d}_visualization_command.md"
+    },
+    "val": {
+      "count": 2,
+      "sample_metadata_pattern": "val/sample_{index:04d}_gt.json",
+      "sample_npz_pattern": "val/sample_{index:04d}.npz",
+      "sample_phantom_3d_pattern": "val/sample_{index:04d}_phantom.gltf",
+      "sample_press_records_pattern": "val/sample_{index:04d}_press_records/",
+      "sample_visualization_command_pattern": "val/sample_{index:04d}_visualization_command.md"
+    }
+  }
+}

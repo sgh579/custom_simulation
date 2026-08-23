@@ -1,0 +1,3 @@
+method,baseline,pattern,ratio,mean_aggregate_dice_delta,min_aggregate_dice_delta,max_aggregate_dice_delta,mean_sample_dice_delta,sample_bootstrap_ci_low,sample_bootstrap_ci_high,num_seeds,num_sample_seed_pairs
+world_curve_unet,sparse_unet,random,0.5,0.04729552668943371,0.04729552668943371,0.04729552668943371,0.04996983993423152,0.04125677048338744,0.05900435732550087,1,400
+world_unet,sparse_unet,random,0.5,0.05214695031831951,0.05214695031831951,0.05214695031831951,0.04176222707462714,0.031324865038724455,0.05119709124284859,1,400

@@ -1,0 +1,113 @@
+{
+  "method": "r128_wrench_temporal_cnn_world_unet",
+  "group": "wrench_world_model",
+  "fixed_threshold": {
+    "threshold": 0.5,
+    "pixel_accuracy": 0.9433245849609375,
+    "precision": 0.7312847725895595,
+    "recall": 0.822755326016785,
+    "dice": 0.774328078178429,
+    "iou": 0.6317580295285192,
+    "tp": 637224,
+    "tn": 5544948,
+    "fp": 234152,
+    "fn": 137276
+  },
+  "threshold_sweep_best": {
+    "threshold": 0.75,
+    "pixel_accuracy": 0.9499055480957032,
+    "precision": 0.8022382650939294,
+    "recall": 0.7645978050355068,
+    "dice": 0.7829659123888301,
+    "iou": 0.6433393446897271,
+    "tp": 592181,
+    "tn": 5633120,
+    "fp": 145980,
+    "fn": 182319
+  },
+  "num_samples": 400,
+  "config": {
+    "package_dir": "data/palpation_synthetic_depth_modes_1000train_400val_400test_20260622/random_trajectory",
+    "out_dir": "WM/runs/sparse_matched_025_100_20260701",
+    "baseline_leaderboard": "runs/nonlinear_trajectory_20x_repeats10_seed20260618/highres_wrench_temporal_variants/leaderboard_with_baselines.csv",
+    "variants": [
+      "wrench_temporal_cnn_sparse_unet",
+      "wrench_temporal_cnn_world_unet",
+      "wrench_temporal_cnn_world_curve_unet"
+    ],
+    "resolutions": [
+      128
+    ],
+    "input_contract": "probe_wrench[H,W,T,6] flattened as [t0_Fx,t0_Fy,...]",
+    "action_contract": "xy + trajectory_xy_offset + indentation_depth + probe_pose",
+    "wrench_channels": [
+      "Fx",
+      "Fy",
+      "Fz",
+      "Mx",
+      "My",
+      "Mz"
+    ],
+    "epochs": 50,
+    "pretrain_epochs": 120,
+    "batch_size": 16,
+    "lr": 0.001,
+    "pretrain_lr": 0.001,
+    "dim": 256,
+    "temporal_depth": 2,
+    "spatial_depth": 6,
+    "heads": 8,
+    "perceiver_latents": 128,
+    "perceiver_depth": 6,
+    "mask_ratios": [
+      0.5,
+      0.75
+    ],
+    "world_target_ratio": 0.35,
+    "seg_context_min": 0.25,
+    "seg_context_max": 1.0,
+    "sparse_context_ratios": [
+      0.1,
+      0.25,
+      0.5,
+      0.75,
+      0.9
+    ],
+    "jepa_ema": 0.996,
+    "lejepa_reg_weight": 0.05,
+    "visreg_projections": 64,
+    "amp": true,
+    "seed": 20260622,
+    "smoke": false,
+    "method": "r128_wrench_temporal_cnn_world_unet",
+    "variant": "wrench_temporal_cnn_world_unet",
+    "resolution": 128,
+    "input": "probe_wrench_plus_action",
+    "model": "temporal_cnn_action_world_unet",
+    "train_samples": 1000,
+    "val_samples": 400,
+    "test_samples": 400,
+    "wrench_input_shape_chw": [
+      120,
+      20,
+      20
+    ],
+    "world_input_shape_chw": [
+      322,
+      20,
+      20
+    ],
+    "target_shape_hw": [
+      128,
+      128
+    ],
+    "pretrain_dir": "WM/runs/sparse_matched_025_100_20260701/pretrain_r128_wrench_temporal_cnn_world_unet",
+    "pretrain_best_val_curve_huber": 0.010382134988904,
+    "pretrain_epochs_completed": 120,
+    "curve_aux_weight": 0.0,
+    "mask_aux_weight": 0.0,
+    "epochs_requested": 50,
+    "epochs_completed": 26,
+    "best_fixed_val_dice": 0.7598464226722718
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "fixed_threshold": {
+    "threshold": 0.5,
+    "pixel_accuracy": 0.9374789428710938,
+    "precision": 0.7152956177689437,
+    "recall": 0.7303465441317251,
+    "dice": 0.7227427315529704,
+    "iou": 0.5658552504709774,
+    "tp": 534044,
+    "tn": 5609818,
+    "fp": 212562,
+    "fn": 197176
+  },
+  "val_selected_threshold": {
+    "threshold": 0.5,
+    "pixel_accuracy": 0.9374789428710938,
+    "precision": 0.7152956177689437,
+    "recall": 0.7303465441317251,
+    "dice": 0.7227427315529704,
+    "iou": 0.5658552504709774,
+    "tp": 534044,
+    "tn": 5609818,
+    "fp": 212562,
+    "fn": 197176
+  },
+  "test_oracle_threshold": {
+    "threshold": 0.5,
+    "pixel_accuracy": 0.9374789428710938,
+    "precision": 0.7152956177689437,
+    "recall": 0.7303465441317251,
+    "dice": 0.7227427315529704,
+    "iou": 0.5658552504709774,
+    "tp": 534044,
+    "tn": 5609818,
+    "fp": 212562,
+    "fn": 197176
+  },
+  "num_samples": 400,
+  "config": {
+    "package_dir": "data/palpation_synthetic_depth_modes_1000train_400val_400test_20260622/random_trajectory",
+    "out_dir": "WM/runs/jepa_visreg_core_20260701",
+    "baseline_leaderboard": "runs/nonlinear_trajectory_20x_repeats10_seed20260618/highres_wrench_temporal_variants/leaderboard_with_baselines.csv",
+    "variants": [
+      "wrench_jepa_vit_unet",
+      "wrench_lejepa_vit_unet",
+      "wrench_visreg_vit_unet"
+    ],
+    "resolutions": [
+      128
+    ],
+    "input_contract": "probe_wrench[H,W,T,6] flattened as [t0_Fx,t0_Fy,...]",
+    "action_contract": "xy + trajectory_xy_offset + indentation_depth + probe_pose",
+    "wrench_channels": [
+      "Fx",
+      "Fy",
+      "Fz",
+      "Mx",
+      "My",
+      "Mz"
+    ],
+    "epochs": 25,
+    "pretrain_epochs": 40,
+    "batch_size": 24,
+    "lr": 0.001,
+    "pretrain_lr": 0.001,
+    "dim": 96,
+    "temporal_depth": 1,
+    "spatial_depth": 4,
+    "heads": 4,
+    "perceiver_latents": 128,
+    "perceiver_depth": 6,
+    "mask_ratios": [
+      0.5
+    ],
+    "world_target_ratio": 0.35,
+    "seg_context_min": 0.25,
+    "seg_context_max": 1.0,
+    "sparse_context_ratios": [
+      0.25,
+      0.5,
+      0.75
+    ],
+    "jepa_ema": 0.996,
+    "lejepa_reg_weight": 0.05,
+    "visreg_projections": 64,
+    "amp": true,
+    "seed": 20260622,
+    "smoke": false,
+    "method": "r128_wrench_jepa_vit_unet_m50",
+    "variant": "wrench_jepa_vit_unet",
+    "resolution": 128,
+    "input": "probe_wrench",
+    "model": "jepa_vit_unet",
+    "train_samples": 1000,
+    "val_samples": 400,
+    "test_samples": 400,
+    "wrench_input_shape_chw": [
+      120,
+      20,
+      20
+    ],
+    "world_input_shape_chw": [
+      322,
+      20,
+      20
+    ],
+    "target_shape_hw": [
+      128,
+      128
+    ],
+    "pretrain_dir": "WM/runs/jepa_visreg_core_20260701/pretrain_r128_jepa_m50",
+    "pretrain_flavor": "jepa",
+    "pretrain_reg_type": "none",
+    "mask_ratio": 0.5,
+    "pretrain_best_val_loss": 0.006313789458945393,
+    "pretrain_epochs_completed": 16,
+    "epochs_requested": 25,
+    "epochs_completed": 18,
+    "best_fixed_val_dice": 0.7382622134685516
+  }
+}

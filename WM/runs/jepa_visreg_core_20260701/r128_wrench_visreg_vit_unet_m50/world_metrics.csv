@@ -1,0 +1,5 @@
+method,split,supports_world_prediction,world_prediction_type,mask_ratio,heldout_latent_mse,heldout_curve_huber,heldout_curve_mse,Fx_mse,Fy_mse,Fz_mse,Mx_mse,My_mse,Mz_mse,sparse_context_ratio,sparse_context_fixed_dice
+r128_wrench_visreg_vit_unet_m50,test_or_val,True,masked_latent_jepa,0.5,0.07586548075079919,,,,,,,,,,
+r128_wrench_visreg_vit_unet_m50,test,False,not_supported,,,,,,,,,,,0.25,
+r128_wrench_visreg_vit_unet_m50,test,False,not_supported,,,,,,,,,,,0.5,
+r128_wrench_visreg_vit_unet_m50,test,False,not_supported,,,,,,,,,,,0.75,

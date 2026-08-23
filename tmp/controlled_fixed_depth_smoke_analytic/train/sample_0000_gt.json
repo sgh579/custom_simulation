@@ -1,0 +1,359 @@
+{
+  "arrays": {
+    "backend": {
+      "dtype": "<U8",
+      "shape": []
+    },
+    "contact_features": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8,
+        5
+      ]
+    },
+    "controlled_schedule_json": {
+      "dtype": "<U231",
+      "shape": []
+    },
+    "fz": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8
+      ]
+    },
+    "indentation_depth": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8
+      ]
+    },
+    "label_extent_json": {
+      "dtype": "<U226",
+      "shape": []
+    },
+    "label_xy": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        2
+      ]
+    },
+    "mask": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6
+      ]
+    },
+    "num_lumps": {
+      "dtype": "int32",
+      "shape": []
+    },
+    "presses": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8,
+        2
+      ]
+    },
+    "probe_force": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8,
+        3
+      ]
+    },
+    "probe_pose": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8,
+        7
+      ]
+    },
+    "probe_torque": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8,
+        3
+      ]
+    },
+    "probe_wrench": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        8,
+        6
+      ]
+    },
+    "scan_mask": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6
+      ]
+    },
+    "xy": {
+      "dtype": "float32",
+      "shape": [
+        6,
+        6,
+        2
+      ]
+    }
+  },
+  "backend": "analytic",
+  "controlled_schedule": {
+    "geometry_seed": 2126655680,
+    "global_index": 0,
+    "lump_count": 1,
+    "lump_stiffness_multipliers": [
+      9.166666666666668
+    ],
+    "normal_k_lambda": 10000.0,
+    "normal_k_mu": 8000.0,
+    "sample_id": "sample_0000",
+    "split": "train",
+    "split_index": 0
+  },
+  "data_contract": {
+    "definition": "docs/data_contract.md",
+    "template": "docs/metadata_template.json",
+    "version": 2
+  },
+  "files": {
+    "metadata": "sample_0000_gt.json",
+    "npz": "sample_0000.npz",
+    "phantom_3d": null,
+    "press_records": null,
+    "scan_animation": null,
+    "visualization_command": "sample_0000_visualization_command.md"
+  },
+  "label": {
+    "extent": "full_phantom_xy",
+    "mask_key": "mask",
+    "shape": [
+      6,
+      6
+    ],
+    "x_values": [
+      -0.09,
+      -0.054,
+      -0.018000000000000002,
+      0.017999999999999988,
+      0.05399999999999999,
+      0.09
+    ],
+    "xy_key": "label_xy",
+    "y_values": [
+      -0.09,
+      -0.054,
+      -0.018000000000000002,
+      0.017999999999999988,
+      0.05399999999999999,
+      0.09
+    ]
+  },
+  "lumps": [
+    {
+      "bottom_depth_from_top": 0.06170639599433644,
+      "center": [
+        0.03888752486152742,
+        0.0091724468211739,
+        0.03575553067681306
+      ],
+      "center_depth_from_top": 0.044244469323186944,
+      "effective_material": {
+        "k_damp": 0.00030276503540974917,
+        "k_lambda": 91666.66666666667,
+        "k_mu": 73333.33333333334
+      },
+      "id": 0,
+      "radii": [
+        0.01394956451629853,
+        0.02436239836759067,
+        0.017461926671149493
+      ],
+      "shape": "box",
+      "stiffness_multiplier": 9.166666666666668,
+      "top_depth_from_top": 0.02678254265203745,
+      "xy_bbox_approx": [
+        0.014525126493936748,
+        -0.01518995154641677,
+        0.06324992322911809,
+        0.03353484518876457
+      ],
+      "yaw": 0.5804704975060071,
+      "z_extent": 0.017461926671149493,
+      "z_interval": [
+        0.018293604005663565,
+        0.05321745734796255
+      ]
+    }
+  ],
+  "mask": {
+    "coverage_fraction": 0.027777777777777776,
+    "positive_cells": 1,
+    "shape": [
+      6,
+      6
+    ],
+    "total_cells": 36
+  },
+  "material": {
+    "k_damp": 0.0001,
+    "k_lambda": 10000.0,
+    "k_mu": 8000.0,
+    "lump_stiffness_max": 30.0,
+    "lump_stiffness_min": 5.0,
+    "probe_contact_mu": 0.8,
+    "soft_contact_kd": 1e-07,
+    "soft_contact_ke": 2000000.0,
+    "soft_contact_mu": 0.5
+  },
+  "num_lumps": 1,
+  "phantom": {
+    "cells_x": 8,
+    "cells_y": 8,
+    "cells_z": 4,
+    "density": 500.0,
+    "height": 0.08,
+    "particle_radius": 0.004,
+    "size_x": 0.18,
+    "size_y": 0.18
+  },
+  "resource_usage": {
+    "disk_usage": {
+      "file_count": 2,
+      "files": {
+        "tmp/controlled_fixed_depth_smoke_analytic/train/sample_0000.npz": {
+          "allocated_bytes": 16384,
+          "bytes": 12823
+        },
+        "tmp/controlled_fixed_depth_smoke_analytic/train/sample_0000_visualization_command.md": {
+          "allocated_bytes": 4096,
+          "bytes": 173
+        }
+      },
+      "root": null,
+      "roots": [
+        "tmp/controlled_fixed_depth_smoke_analytic/train/sample_0000.npz",
+        "tmp/controlled_fixed_depth_smoke_analytic/train/sample_0000_visualization_command.md"
+      ],
+      "total_allocated_bytes": 20480,
+      "total_bytes": 12996
+    },
+    "elapsed_seconds": 0.057159772026352584,
+    "finished_at_local": "2026-06-29T17:29:22",
+    "gpu_memory": {
+      "after_used_bytes": 463470592,
+      "available": true,
+      "before_used_bytes": 463470592,
+      "device": null,
+      "note": "memory.used is full-device usage reported by nvidia-smi and can include other processes.",
+      "peak_delta_from_start_bytes": 0,
+      "peak_observed_used_bytes": 463470592,
+      "poll_interval_seconds": 0.2,
+      "query_error": null,
+      "query_method": "nvidia-smi memory.used polling",
+      "sample_count": 0,
+      "unit": "bytes"
+    },
+    "started_at_local": "2026-06-29T17:29:22"
+  },
+  "run": {
+    "date_prefix": null,
+    "date_prefix_format": "yyyymmdd-hhmmss",
+    "date_prefixed_directory": null,
+    "directory_name": "train",
+    "output_dir": "tmp/controlled_fixed_depth_smoke_analytic/train"
+  },
+  "runtime": {
+    "device": {
+      "requested": "cuda:0",
+      "required": "cuda:0"
+    },
+    "newton": {
+      "root": "/home/guoheng/newton",
+      "simulator_entrypoint": "palpation_sim.newton_vbd.NewtonVBDPalpationSimulator"
+    },
+    "python": {
+      "conda_default_env": "palpation",
+      "environment_manager": "conda",
+      "environment_name": "palpation",
+      "executable": "/home/guoheng/.conda/envs/palpation/bin/python"
+    }
+  },
+  "sample_id": "sample_0000",
+  "scan": {
+    "edge_margin": 0.015,
+    "grid_h": 6,
+    "grid_w": 6,
+    "indentation_values": [
+      0.0,
+      0.0017142857142857144,
+      0.003428571428571429,
+      0.0051428571428571435,
+      0.006857142857142858,
+      0.008571428571428572,
+      0.010285714285714287,
+      0.012
+    ],
+    "max_indentation": 0.012,
+    "preload_gap": 0.0005,
+    "press_steps": 8,
+    "probe_radius": 0.012,
+    "reset_between_points": true,
+    "sim_dt": 0.0016666666666666668,
+    "sim_substeps_per_depth": 3,
+    "soft_contact_margin": 0.004,
+    "vbd_iterations": 10,
+    "x_values": [
+      -0.075,
+      -0.045,
+      -0.015,
+      0.015,
+      0.045,
+      0.075
+    ],
+    "y_values": [
+      -0.075,
+      -0.045,
+      -0.015,
+      0.015,
+      0.045,
+      0.075
+    ]
+  },
+  "scan_label_compatibility": {
+    "scan_extent": "edge_margin_limited",
+    "scan_mask_key": "scan_mask",
+    "scan_xy_key": "xy"
+  },
+  "schema_name": "palpation_sample_metadata",
+  "schema_version": 3,
+  "split": "train",
+  "units": {
+    "force": "N",
+    "lame_parameters": "Pa",
+    "length": "m",
+    "mass": "kg",
+    "stiffness": "N/m",
+    "time": "s"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "completed": 1,
+  "current_sample": {
+    "geometry_seed": 2126655680,
+    "global_index": 0,
+    "lump_count": 4,
+    "lump_stiffness_multipliers": [
+      13.333333333333334,
+      5.0,
+      30.0,
+      21.666666666666668
+    ],
+    "normal_k_lambda": 8000.0,
+    "normal_k_mu": 8000.0,
+    "sample_id": "sample_0000",
+    "split": "train",
+    "split_index": 0
+  },
+  "elapsed_seconds": 2.4004571437835693,
+  "failed": 0,
+  "out_dir": "tmp/controlled_fixed_depth_smoke_newton",
+  "skipped": 0,
+  "state": "complete",
+  "updated_at": "2026-06-29T17:30:11+1000",
+  "worker_count": 1,
+  "worker_index": 0
+}

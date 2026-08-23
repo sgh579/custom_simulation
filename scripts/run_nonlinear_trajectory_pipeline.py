@@ -16,7 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate nonlinear-trajectory palpation data and run segmentation sweeps.")
-    parser.add_argument("--package-dir", type=Path, default=Path("runs/dataset_packages/palpation_nonlinear_trajectory_20x_100p40p40_repeats10_seed20260618"))
+    parser.add_argument("--package-dir", type=Path, default=Path("data/palpation_synthetic_depth_modes_1000train_400val_400test_20260622/random_trajectory"))
     parser.add_argument("--run-dir", type=Path, default=Path("runs/nonlinear_trajectory_20x_repeats10_seed20260618"))
     parser.add_argument("--num-train-phantoms", type=int, default=100)
     parser.add_argument("--num-val-phantoms", type=int, default=40)
@@ -127,9 +127,9 @@ def run_generation(args: argparse.Namespace, dashboard: "Dashboard", logs_dir: P
 
 
 def run_training(args: argparse.Namespace, dashboard: "Dashboard", logs_dir: Path) -> None:
-    baseline_dir = args.run_dir / "highres_segmentation_sweep"
-    temporal_dir = args.run_dir / "highres_fz_temporal_variants"
-    stiffness_cmd = [
+    baseline_dir = args.run_dir / "highres_wrench_segmentation_sweep"
+    temporal_dir = args.run_dir / "highres_wrench_temporal_variants"
+    wrench_cmd = [
         sys.executable,
         "scripts/run_highres_segmentation_sweep.py",
         "--package-dir",
@@ -139,41 +139,7 @@ def run_training(args: argparse.Namespace, dashboard: "Dashboard", logs_dir: Pat
         "--resolutions",
         args.resolutions,
         "--inputs",
-        "stiffness,stiffness_random_pair",
-        "--models",
-        "kmeans,mlp,shallow_cnn,unet",
-        "--seed",
-        str(args.seed),
-        "--stiffness-random-seed",
-        str(args.seed + 17),
-        "--limited-trajectory-seed",
-        str(args.seed + 31),
-        "--trajectory-input-steps",
-        str(args.trajectory_input_steps),
-        "--positional-embedding-dim",
-        str(args.positional_embedding_dim),
-        "--device",
-        args.device,
-        "--epochs",
-        str(args.epochs),
-        "--patience",
-        str(args.patience),
-        "--batch-size",
-        str(args.batch_size),
-        "--lr",
-        str(args.lr),
-    ]
-    raw_cmd = [
-        sys.executable,
-        "scripts/run_highres_segmentation_sweep.py",
-        "--package-dir",
-        str(args.package_dir),
-        "--out-dir",
-        str(baseline_dir),
-        "--resolutions",
-        args.resolutions,
-        "--inputs",
-        "fz,fz_limited_resampled,press_limited_resampled,fz_limited_sincos",
+        "wrench",
         "--models",
         "mlp,shallow_cnn,unet",
         "--seed",
@@ -197,6 +163,16 @@ def run_training(args: argparse.Namespace, dashboard: "Dashboard", logs_dir: Pat
         "--lr",
         str(args.lr),
     ]
+    wrench_variants = ",".join(
+        [
+            "wrench_unet_aug_focal",
+            "wrench_temporal_cnn16_unet",
+            "wrench_temporal_cnn32_unet",
+            "wrench_temporal_gru32_unet",
+            "wrench_temporal_attention32_unet",
+            "wrench_temporal_multiscale32_unet",
+        ]
+    )
     temporal_cmd = [
         sys.executable,
         "scripts/run_highres_fz_temporal_variant_sweep.py",
@@ -208,6 +184,8 @@ def run_training(args: argparse.Namespace, dashboard: "Dashboard", logs_dir: Pat
         str(baseline_dir),
         "--resolutions",
         args.resolutions,
+        "--variants",
+        wrench_variants,
         "--seed",
         str(args.seed),
         "--limited-trajectory-seed",
@@ -228,14 +206,12 @@ def run_training(args: argparse.Namespace, dashboard: "Dashboard", logs_dir: Pat
         str(args.lr),
     ]
     if args.smoke:
-        stiffness_cmd.append("--smoke")
-        raw_cmd.append("--smoke")
+        wrench_cmd.append("--smoke")
         temporal_cmd.append("--smoke")
 
     for phase, cmd in (
-        ("train_stiffness_methods", stiffness_cmd),
-        ("train_raw_curve_methods", raw_cmd),
-        ("train_temporal_methods", temporal_cmd),
+        ("train_wrench_methods", wrench_cmd),
+        ("train_wrench_temporal_methods", temporal_cmd),
     ):
         dashboard.update(phase=phase, command=cmd, completed_samples=count_samples(args.package_dir / "data"), updated_at=utc_now())
         run_logged(cmd, logs_dir / f"{phase}.log")
@@ -342,14 +318,14 @@ def count_samples(data_dir: Path) -> dict[str, int]:
 
 def collect_metrics(args: argparse.Namespace) -> dict[str, Any]:
     metrics: dict[str, Any] = {}
-    baseline_path = args.run_dir / "highres_segmentation_sweep" / "leaderboard.csv"
-    temporal_path = args.run_dir / "highres_fz_temporal_variants" / "leaderboard_with_baselines.csv"
+    baseline_path = args.run_dir / "highres_wrench_segmentation_sweep" / "leaderboard.csv"
+    temporal_path = args.run_dir / "highres_wrench_temporal_variants" / "leaderboard_with_baselines.csv"
     if baseline_path.exists():
-        metrics["baseline_leaderboard"] = str(baseline_path)
-        metrics["best_baseline"] = best_row(baseline_path)
+        metrics["wrench_baseline_leaderboard"] = str(baseline_path)
+        metrics["best_wrench_baseline"] = best_row(baseline_path)
     if temporal_path.exists():
-        metrics["temporal_leaderboard_with_baselines"] = str(temporal_path)
-        metrics["best_temporal_or_baseline"] = best_row(temporal_path)
+        metrics["wrench_temporal_leaderboard_with_baselines"] = str(temporal_path)
+        metrics["best_wrench_temporal_or_baseline"] = best_row(temporal_path)
     return metrics
 
 

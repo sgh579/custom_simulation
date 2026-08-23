@@ -1,0 +1,10 @@
+method,split,supports_world_prediction,world_prediction_type,mask_ratio,heldout_latent_mse,heldout_curve_huber,heldout_curve_mse,Fx_mse,Fy_mse,Fz_mse,Mx_mse,My_mse,Mz_mse,sparse_context_ratio,sparse_context_fixed_dice
+r128_wrench_temporal_cnn_sparse_unet,test_or_val,True,action_conditioned_curve,0.35,,0.17560975145664717,0.3907321993967326,0.8500133486960432,0.8515264058284623,0.5744700040748651,0.01827541323874494,0.025393451718117695,0.0247145920348682,,
+r128_wrench_temporal_cnn_sparse_unet,test,True,sparse_context_segmentation,,,,,,,,,,,0.25,0.20391660370423312
+r128_wrench_temporal_cnn_sparse_unet,test,True,sparse_context_segmentation,,,,,,,,,,,0.5,0.23042150274893097
+r128_wrench_temporal_cnn_world_unet,test_or_val,True,action_conditioned_curve,0.35,,0.1632874794793621,0.36021781191369606,0.7966344321646341,0.8198887121833959,0.5264308564434803,0.007706020562778494,0.0060156416043108,0.004631228563262195,,
+r128_wrench_temporal_cnn_world_unet,test,True,sparse_context_segmentation,,,,,,,,,,,0.25,0.279031291896055
+r128_wrench_temporal_cnn_world_unet,test,True,sparse_context_segmentation,,,,,,,,,,,0.5,0.2725117806654291
+r128_wrench_visreg_vit_unet_m50,test_or_val,True,masked_latent_jepa,0.5,0.7142029404640198,,,,,,,,,,
+r128_wrench_visreg_vit_unet_m50,test,False,not_supported,,,,,,,,,,,0.25,
+r128_wrench_visreg_vit_unet_m50,test,False,not_supported,,,,,,,,,,,0.5,
