@@ -12,7 +12,7 @@ from typing import Any
 
 
 CONDA_ENV_NAME = "palpation"
-DEFAULT_NEWTON_ROOT = Path("/home/guoheng/newton")
+DEFAULT_NEWTON_ROOT = Path(os.environ.get("PALPATION_NEWTON_ROOT", "/home/guoheng/newton")).expanduser()
 REQUIRED_NEWTON_DEVICE = "cuda:0"
 SIMULATOR_ENTRYPOINT = "palpation_sim.newton_vbd.NewtonVBDPalpationSimulator"
 DATA_CONTRACT_VERSION = 2

@@ -28,6 +28,7 @@ from scripts.run_segmentation_accuracy_sweep import (  # noqa: E402
     metrics_from_counts,
     normalize_maps,
     normalized_stiffness_maps,
+    preload_subtract_fz,
     predict_neural,
 )
 from palpation_sim.workflow import require_runtime_environment  # noqa: E402
@@ -79,6 +80,12 @@ METHOD_SPECS = [
         "input_family": "full_curve_raw_fz",
         "model_family": "unet",
     },
+    {
+        "method": "unet_delta_fz_norm_dataset",
+        "requested_label": "3.4 preload-subtracted full curve U-Net",
+        "input_family": "full_curve_delta_fz",
+        "model_family": "unet",
+    },
 ]
 
 
@@ -127,9 +134,13 @@ def main() -> None:
             rows.append(_load_row(method_dir / "leaderboard_row.json"))
             print(f"skip existing {method}", flush=True)
             continue
+        source_summary_path = args.sweep_dir / method / "metrics_summary.json"
+        if not source_summary_path.exists():
+            print(f"skip missing {method}: {source_summary_path}", flush=True)
+            continue
         print(f"evaluating {method}", flush=True)
         scores = scores_for_method(method, train, test, args.sweep_dir, device=device, batch_size=args.batch_size)
-        val_summary = _load_json(args.sweep_dir / method / "metrics_summary.json")
+        val_summary = _load_json(source_summary_path)
         fixed_threshold = float(val_summary.get("fixed_threshold", {}).get("threshold", 0.5))
         val_best_threshold = float(val_summary.get("threshold_sweep_best", {}).get("threshold", fixed_threshold))
         row = write_test_method(
@@ -147,7 +158,8 @@ def main() -> None:
         rows.append(row)
 
     rows.sort(key=lambda row: float(row["test_primary_dice"]), reverse=True)
-    _write_csv(args.out_dir / "leaderboard.csv", rows, list(rows[0].keys()))
+    if rows:
+        _write_csv(args.out_dir / "leaderboard.csv", rows, list(rows[0].keys()))
     write_report(args.out_dir, rows, elapsed_seconds=time.perf_counter() - started)
     print(f"test evaluation complete: {args.out_dir}", flush=True)
 
@@ -175,6 +187,10 @@ def scores_for_method(
         x_train, x_test = normalize_maps(train.fz, test.fz, mode="dataset")
         model = build_model(method, input_channels=x_train.shape[1], spatial_shape=train.masks.shape[-2:])
         return predict_checkpoint(model, sweep_dir / method / "best.pt", x_test, device=device, batch_size=batch_size)
+    if method == "unet_delta_fz_norm_dataset":
+        x_train, x_test = normalize_maps(preload_subtract_fz(train.fz), preload_subtract_fz(test.fz), mode="dataset")
+        model = build_model(method, input_channels=x_train.shape[1], spatial_shape=train.masks.shape[-2:])
+        return predict_checkpoint(model, sweep_dir / method / "best.pt", x_test, device=device, batch_size=batch_size)
     raise ValueError(f"Unsupported method: {method}")
 
 
@@ -184,7 +200,7 @@ def build_model(method: str, *, input_channels: int, spatial_shape: tuple[int, i
         return PointMLP(input_channels, hidden_dims=(128, 64))
     if method in {"shallow_cnn_stiffness", "shallow_cnn_fz"}:
         return ShallowCNN(input_channels, base_channels=32)
-    if method in {"unet_stiffness", "unet_fz_norm_dataset"}:
+    if method in {"unet_stiffness", "unet_fz_norm_dataset", "unet_delta_fz_norm_dataset"}:
         return ValidationUNet(input_channels, base_channels=24)
     raise ValueError(f"No model builder for method: {method}")
 

@@ -39,7 +39,7 @@ class NewtonVBDPalpationSimulator:
         self.material = material
         self.scan = scan
         require_runtime_environment(require_newton=True, newton_root=newton_root)
-        self.newton, self.wp, self.SolverVBD = _import_newton(newton_root)
+        self.newton, self.wp, self.SolverVBD, self.eval_tetrahedra_forces = _import_newton(newton_root)
         self.device = _resolve_device(self.wp, device)
 
     def run_sample(
@@ -63,6 +63,8 @@ class NewtonVBDPalpationSimulator:
 
         initial_particle_q = wp.clone(state_0.particle_q)
         initial_body_q = wp.clone(state_0.body_q)
+        particle_force_buffer = wp.zeros(model.particle_count, dtype=wp.vec3, device=model.device)
+        bottom_vertex_mask = np.asarray(mesh.bottom_vertex_mask, dtype=bool)
 
         collision_pipeline = newton.CollisionPipeline(model, soft_contact_margin=scan.soft_contact_margin)
         contacts = collision_pipeline.contacts()
@@ -135,6 +137,10 @@ class NewtonVBDPalpationSimulator:
                         solver,
                         probe_shape,
                         self.material,
+                        self.eval_tetrahedra_forces,
+                        control,
+                        particle_force_buffer,
+                        bottom_vertex_mask,
                     )
                     force_z = max(float(wrench[2]), 0.0)
 
@@ -234,7 +240,7 @@ class NewtonVBDPalpationSimulator:
         return model, probe_body, probe_shape
 
 
-def _import_newton(newton_root: str | Path | None) -> tuple[Any, Any, Any]:
+def _import_newton(newton_root: str | Path | None) -> tuple[Any, Any, Any, Any]:
     if newton_root is not None:
         root = Path(newton_root).expanduser()
         if root != DEFAULT_NEWTON_ROOT:
@@ -248,12 +254,13 @@ def _import_newton(newton_root: str | Path | None) -> tuple[Any, Any, Any]:
         import newton  # type: ignore[import-not-found]
         import warp as wp  # type: ignore[import-not-found]
         from newton.solvers import SolverVBD  # type: ignore[import-not-found]
+        from newton._src.solvers.semi_implicit.kernels_particle import eval_tetrahedra_forces  # type: ignore[import-not-found]
     except ImportError as exc:
         raise NewtonUnavailableError(
             "Cannot import Newton/Warp. This workflow expects conda env 'palpation' "
             f"and Newton at {DEFAULT_NEWTON_ROOT}."
         ) from exc
-    return newton, wp, SolverVBD
+    return newton, wp, SolverVBD, eval_tetrahedra_forces
 
 
 def _resolve_device(wp: Any, device: str | None) -> str:
@@ -351,6 +358,39 @@ def _estimate_probe_reaction_wrench(
     solver: Any,
     probe_shape: int,
     material: MaterialConfig,
+    eval_tetrahedra_forces: Any,
+    control: Any,
+    particle_force_buffer: Any,
+    bottom_vertex_mask: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    residual_wrench, patch = _estimate_probe_contact_residual_wrench(
+        model,
+        state,
+        contacts,
+        solver,
+        probe_shape,
+        material,
+    )
+    support_wrench = _estimate_probe_support_reaction_wrench(
+        model,
+        state,
+        control,
+        eval_tetrahedra_forces,
+        particle_force_buffer,
+        bottom_vertex_mask,
+    )
+    if np.all(np.isfinite(support_wrench)):
+        return support_wrench, patch
+    return residual_wrench, patch
+
+
+def _estimate_probe_contact_residual_wrench(
+    model: Any,
+    state: Any,
+    contacts: Any,
+    solver: Any,
+    probe_shape: int,
+    material: MaterialConfig,
 ) -> tuple[np.ndarray, np.ndarray]:
     count = int(contacts.soft_contact_count.numpy()[0])
     if count <= 0:
@@ -397,6 +437,28 @@ def _estimate_probe_reaction_wrench(
         dtype=np.float32,
     )
     return wrench, patch
+
+
+def _estimate_probe_support_reaction_wrench(
+    model: Any,
+    state: Any,
+    control: Any,
+    eval_tetrahedra_forces: Any,
+    particle_force_buffer: Any,
+    bottom_vertex_mask: np.ndarray,
+) -> np.ndarray:
+    # In quasi-static equilibrium, the probe reaction is balanced by the support
+    # reaction at the fixed bottom boundary. This avoids using the post-solve
+    # contact penetration residual as a force proxy.
+    if bottom_vertex_mask.size == 0 or not np.any(bottom_vertex_mask):
+        return np.full(6, np.nan, dtype=np.float32)
+    particle_force_buffer.zero_()
+    eval_tetrahedra_forces(model, state, control, particle_force_buffer)
+    bottom_internal_force = np.sum(particle_force_buffer.numpy()[bottom_vertex_mask], axis=0).astype(np.float32)
+    support_force = -bottom_internal_force
+    wrench = np.zeros(6, dtype=np.float32)
+    wrench[:3] = support_force
+    return wrench
 
 
 def _transform_points(transform: np.ndarray, points: np.ndarray) -> np.ndarray:

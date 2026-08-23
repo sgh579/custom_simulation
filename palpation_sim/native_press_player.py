@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 
 import numpy as np
@@ -38,6 +39,7 @@ def run_press_player(
     sample_path, metadata_path = resolve_sample_or_metadata(selector, data_dir)
     if sample_path is None:
         raise SystemExit("The native press player needs a .npz sample.")
+    sample_paths = _sample_paths_for_initial(sample_path, data_dir)
 
     app = QtWidgets.QApplication.instance()
     owns_app = app is None
@@ -49,6 +51,7 @@ def run_press_player(
         deps,
         sample_path=sample_path,
         metadata_path=metadata_path,
+        sample_paths=sample_paths,
         surface_resolution=surface_resolution,
         start_row=start_row,
         start_col=start_col,
@@ -92,6 +95,7 @@ class _PressPlayerWindowMixin:
         *,
         sample_path: Path,
         metadata_path: Path | None,
+        sample_paths: list[Path],
         surface_resolution: int,
         start_row: int | None,
         start_col: int | None,
@@ -109,8 +113,35 @@ class _PressPlayerWindowMixin:
         self.mesh_style = _normalize_mesh_style(mesh_style)
         self.tet_stride = max(int(tet_stride), 1)
         self.vertex_stride = max(int(vertex_stride), 1)
+        self.surface_resolution = surface_resolution
+        self.start_row = start_row
+        self.start_col = start_col
         self.fem_deform_targets: list[tuple[object, np.ndarray]] = []
+        self.sample_paths = [path.resolve() for path in sample_paths] or [sample_path.resolve()]
+        resolved_sample = sample_path.resolve()
+        resolved_paths = [path.resolve() for path in self.sample_paths]
+        self.sample_index = resolved_paths.index(resolved_sample) if resolved_sample in resolved_paths else 0
+        self._updating_controls = False
 
+        self.sample_path = sample_path.resolve()
+        self.metadata_path = metadata_path.resolve() if metadata_path is not None else None
+        self._load_sample_data(self.sample_path)
+        self._sample_labels = _sample_labels(self.sample_paths)
+
+        self.setWindowTitle(f"Native press player - {self.sample_path.name} [{self.mesh_style}]")
+        self._build_ui()
+        self._build_scene(self.surface_resolution)
+        self._update_curve()
+        self._update_frame()
+
+        self.timer = self.QtCore.QTimer(self)
+        self.timer.setInterval(33)
+        self.timer.timeout.connect(self._advance)
+
+    def _load_sample_data(self, sample_path: Path) -> None:
+        sample_path, metadata_path = resolve_sample_or_metadata(sample_path)
+        if sample_path is None:
+            raise FileNotFoundError("The native press player needs a .npz sample.")
         self.sample_path = sample_path
         self.metadata_path = metadata_path
         self.phantom, self.scan, _material, self.lumps, _metadata = load_phantom_scan_material_lumps(
@@ -133,20 +164,9 @@ class _PressPlayerWindowMixin:
         self.rows, self.cols, self.steps = self.fz.shape
         peak = np.nanmax(self.fz, axis=-1)
         default_row, default_col = (int(v) for v in np.unravel_index(np.nanargmax(peak), peak.shape))
-        self.row = _clamp_index(default_row if start_row is None else start_row, self.rows)
-        self.col = _clamp_index(default_col if start_col is None else start_col, self.cols)
+        self.row = _clamp_index(default_row if self.start_row is None else self.start_row, self.rows)
+        self.col = _clamp_index(default_col if self.start_col is None else self.start_col, self.cols)
         self.step = 0
-        self._updating_controls = False
-
-        self.setWindowTitle(f"Native press player - {sample_path.name} [{self.mesh_style}]")
-        self._build_ui()
-        self._build_scene(surface_resolution)
-        self._update_curve()
-        self._update_frame()
-
-        self.timer = self.QtCore.QTimer(self)
-        self.timer.setInterval(33)
-        self.timer.timeout.connect(self._advance)
 
     def _build_ui(self) -> None:
         QtCore = self.QtCore
@@ -172,6 +192,21 @@ class _PressPlayerWindowMixin:
 
         self.info = QtWidgets.QLabel()
         self.info.setWordWrap(True)
+
+        sample_row = QtWidgets.QHBoxLayout()
+        self.prev_sample_button = QtWidgets.QPushButton("Prev")
+        self.next_sample_button = QtWidgets.QPushButton("Next")
+        self.sample_combo = QtWidgets.QComboBox()
+        self.sample_combo.addItems(self._sample_labels)
+        self.sample_combo.setCurrentIndex(self.sample_index)
+        self.prev_sample_button.setEnabled(len(self.sample_paths) > 1)
+        self.next_sample_button.setEnabled(len(self.sample_paths) > 1)
+        self.sample_combo.setEnabled(len(self.sample_paths) > 1)
+        sample_row.addWidget(self.prev_sample_button)
+        sample_row.addWidget(self.sample_combo, stretch=1)
+        sample_row.addWidget(self.next_sample_button)
+        side_layout.addLayout(sample_row)
+
         side_layout.addWidget(self.info)
 
         form = QtWidgets.QGridLayout()
@@ -248,6 +283,9 @@ class _PressPlayerWindowMixin:
         self.row_spin.valueChanged.connect(self._press_changed)
         self.col_spin.valueChanged.connect(self._press_changed)
         self.slider.valueChanged.connect(self._step_changed)
+        self.prev_sample_button.clicked.connect(lambda: self._step_sample(-1))
+        self.next_sample_button.clicked.connect(lambda: self._step_sample(1))
+        self.sample_combo.currentIndexChanged.connect(self._sample_combo_changed)
         self.play_button.toggled.connect(self._play_toggled)
         self.surface_toggle.toggled.connect(lambda checked: self._set_actor_visible(self.surface_actor, checked))
         self.lump_toggle.toggled.connect(lambda checked: self._set_actor_visible(self.lump_actors, checked))
@@ -343,6 +381,45 @@ class _PressPlayerWindowMixin:
             (0.0, 0.0, 1.0),
         ]
         self.plotter.add_axes()
+        self._apply_visibility_toggles()
+
+    def _sample_combo_changed(self, index: int) -> None:
+        if self._updating_controls or index < 0 or index == self.sample_index:
+            return
+        self._load_sample_index(index)
+
+    def _step_sample(self, delta: int) -> None:
+        if not self.sample_paths:
+            return
+        self._load_sample_index((self.sample_index + int(delta)) % len(self.sample_paths))
+
+    def _load_sample_index(self, index: int) -> None:
+        if not self.sample_paths:
+            return
+        was_playing = hasattr(self, "timer") and self.timer.isActive()
+        if was_playing:
+            self.timer.stop()
+        self.sample_index = int(np.clip(index, 0, len(self.sample_paths) - 1))
+        self._load_sample_data(self.sample_paths[self.sample_index])
+        self._sync_sample_controls()
+        self.plotter.clear()
+        self._build_scene(self.surface_resolution)
+        self._update_curve()
+        self._update_frame()
+        if was_playing:
+            self.timer.start()
+
+    def _sync_sample_controls(self) -> None:
+        self._updating_controls = True
+        self.setWindowTitle(f"Native press player - {self.sample_path.name} [{self.mesh_style}]")
+        self.sample_combo.setCurrentIndex(self.sample_index)
+        self.row_spin.setRange(0, self.rows - 1)
+        self.row_spin.setValue(self.row)
+        self.col_spin.setRange(0, self.cols - 1)
+        self.col_spin.setValue(self.col)
+        self.slider.setRange(0, self.steps - 1)
+        self.slider.setValue(self.step)
+        self._updating_controls = False
 
     def _press_changed(self) -> None:
         if self._updating_controls:
@@ -419,6 +496,17 @@ class _PressPlayerWindowMixin:
         )
         self._sync_step_control()
         self.plotter.update()
+
+    def _apply_visibility_toggles(self) -> None:
+        self._set_actor_visible(self.surface_actor, self.surface_toggle.isChecked())
+        self._set_actor_visible(self.lump_actors, self.lump_toggle.isChecked())
+        self._set_actor_visible(self.scan_actor, self.scan_toggle.isChecked())
+        self._set_actor_visible(self.probe_actor, self.probe_toggle.isChecked())
+        if self._uses_discrete_mesh:
+            self._set_actor_visible(self.normal_tissue_actor, self.normal_tissue_toggle.isChecked())
+            self._set_actor_visible(self.lump_tet_actors, self.lump_tet_toggle.isChecked())
+            self._set_actor_visible(self.tet_wire_actor, self.tet_wire_toggle.isChecked())
+            self._set_actor_visible(self.vertex_actor, self.vertex_toggle.isChecked())
 
     def _add_discrete_fem_layers(self) -> None:
         if "mesh_vertices" not in self.mesh_arrays or "mesh_tets" not in self.mesh_arrays:
@@ -504,6 +592,83 @@ class _PressPlayerWindowMixin:
         elif actors is not None:
             actors.SetVisibility(bool(visible))
         self.plotter.update()
+
+
+def _sample_paths_for_initial(sample_path: Path, data_dir: Path | None) -> list[Path]:
+    sample_path = sample_path.resolve()
+    roots = []
+    if data_dir is not None:
+        roots.append(data_dir.expanduser().resolve())
+    roots.append(sample_path.parent)
+    for root in roots:
+        if not root.exists():
+            continue
+        paths = [path.resolve() for path in root.glob("*.npz")]
+        if not paths:
+            continue
+        paths = _ordered_sample_paths(root, paths)
+        if sample_path in paths:
+            return paths
+    return [sample_path]
+
+
+def _ordered_sample_paths(root: Path, paths: list[Path]) -> list[Path]:
+    by_name = {path.name: path for path in paths}
+    ordered: list[Path] = []
+    for selection_path in _selection_file_candidates(root):
+        rows = _read_selection_rows(selection_path)
+        if not rows:
+            continue
+        rows.sort(key=lambda row: (_selection_rank(row), row.get("sample", "")))
+        for row in rows:
+            path = by_name.get(row.get("sample", ""))
+            if path is not None and path not in ordered:
+                ordered.append(path)
+        break
+    ordered.extend(path for path in sorted(paths) if path not in ordered)
+    return ordered
+
+
+def _sample_labels(paths: list[Path]) -> list[str]:
+    records: dict[str, dict[str, str]] = {}
+    for root in {path.parent for path in paths}:
+        for selection_path in _selection_file_candidates(root):
+            rows = _read_selection_rows(selection_path)
+            if rows:
+                records.update({row.get("sample", ""): row for row in rows})
+                break
+
+    labels = []
+    for index, path in enumerate(paths, 1):
+        row = records.get(path.name)
+        if row is None:
+            labels.append(path.name)
+            continue
+        rank = row.get("rank") or str(index)
+        dice = row.get("val_selected_dice")
+        if dice not in (None, ""):
+            labels.append(f"{int(float(rank)):02d}  {path.name}  Dice {float(dice):.3f}")
+        else:
+            labels.append(f"{int(float(rank)):02d}  {path.name}")
+    return labels
+
+
+def _selection_file_candidates(root: Path) -> list[Path]:
+    return [root / "selected_candidates.csv", root.parent / "selected_candidates.csv"]
+
+
+def _read_selection_rows(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    with path.open("r", newline="", encoding="utf-8") as f:
+        return [row for row in csv.DictReader(f) if row.get("sample")]
+
+
+def _selection_rank(row: dict[str, str]) -> float:
+    try:
+        return float(row.get("rank", "inf"))
+    except ValueError:
+        return float("inf")
 
 
 def _clamp_index(value: int, count: int) -> int:

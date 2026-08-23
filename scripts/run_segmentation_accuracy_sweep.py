@@ -59,6 +59,7 @@ METHOD_MEANINGS = {
     "unet_fz_norm_none": "U-Net on raw Fz channels without input normalization.",
     "unet_fz_features_dataset_norm": "U-Net on raw Fz plus mechanical feature maps with dataset normalization.",
     "unet_fz_norm_dataset": "U-Net on raw Fz channels with dataset normalization.",
+    "unet_delta_fz_norm_dataset": "U-Net on preload-subtracted Fz-Fz[0] channels with dataset normalization.",
     "unet_stiffness": "U-Net on the single equivalent-stiffness map.",
     "temporal_transformer_spatial_head": "Per-point temporal Transformer embeddings followed by a shallow CNN spatial head.",
     "shallow_cnn_fz": "Shallow 2D CNN on the raw Fz channel map.",
@@ -954,6 +955,27 @@ def run_unet_improvements(train: SplitData, val: SplitData, out_dir: Path, conte
             augment=False,
         )
 
+    delta_train, delta_val = normalize_maps(preload_subtract_fz(train.fz), preload_subtract_fz(val.fz), mode="dataset")
+    train_neural_method(
+        "unet_delta_fz_norm_dataset",
+        "unet",
+        ValidationUNet(delta_train.shape[1], base_channels=24),
+        delta_train,
+        train.masks,
+        delta_val,
+        val.masks,
+        val.names,
+        out_dir,
+        context={
+            **context,
+            "input": "delta_fz",
+            "force_preprocess": "subtract_initial_fz_per_curve",
+            "normalize_mode": "dataset",
+        },
+        args=args,
+        augment=False,
+    )
+
     fz_train, fz_val = normalize_maps(train.fz, val.fz, mode="dataset")
     feat_train, feat_val = normalize_maps(train.features, val.features, mode="dataset")
     combo_train = np.concatenate([fz_train, feat_train], axis=1)
@@ -991,6 +1013,14 @@ def run_unet_improvements(train: SplitData, val: SplitData, out_dir: Path, conte
 
 def _stiffness(split: SplitData) -> np.ndarray:
     return split.features[:, FEATURE_NAMES.index("equivalent_stiffness")]
+
+
+def preload_subtract_fz(fz: np.ndarray) -> np.ndarray:
+    fz = np.asarray(fz, dtype=np.float32)
+    if fz.ndim < 2:
+        raise ValueError(f"Expected Fz with sample and depth/channel axes, got shape {fz.shape}")
+    out = fz - fz[:, :1, ...]
+    return np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
 
 
 def normalized_stiffness_maps(train: SplitData, val: SplitData) -> tuple[np.ndarray, np.ndarray]:
